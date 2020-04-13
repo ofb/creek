@@ -43,20 +43,38 @@ class ScalpAlgo:
         self._position = position[0] if len(position) > 0 else None
         if self._position is not None:
             if self._order is None:
-                self._state = 'TO_SELL'
-            else:
-                self._state = 'SELL_SUBMITTED'
-                if self._order.side != 'sell':
+                if self._position.side == 'long':
+                    self._state = 'LONG'
+                elif self._position.side == 'short':
+                    self._state = 'SHORT'
+                else:
+                    self._state = 'NEUTRAL'
                     self._l.warn(
+                        f'position {self._position} is neither short nor long, '
+                        f'state {self._state} mismatch position {self._position}')
+            else:
+                if self._position.side == 'long' and self._order.side == 'sell':
+                    self._state = 'SELL_SUBMITTED'
+                elif self._position.side == 'short' and self._order.side == 'buy':
+                    self._state = 'COVER_SUBMITTED'
+                else:
+                    self._state = 'NEUTRAL'
+                    self._l.warn(f'order {self._order} is neither sell nor buy, '
+                        f'position {self._position} mismatch order {self._order}, '
                         f'state {self._state} mismatch order {self._order}')
         else:
             if self._order is None:
                 self._state = 'NEUTRAL'
-            else:
+            elif self._order.side == 'buy':
                 self._state = 'BUY_SUBMITTED'
-                if self._order.side != 'buy':
-                    self._l.warn(
-                        f'state {self._state} mismatch order {self._order}')
+            elif self._order.side == 'sell':
+                self._state = 'SHORT_SUBMITTED'
+            else:
+                self._state = 'NEUTRAL'
+                self._l.warn(
+                    f'order {self._order} is neither sell nor buy, '
+                    f'state {self._state} mismatch order {self._order}'
+                )
 
     def _now(self):
         return pd.Timestamp.now(tz='America/New_York')
@@ -69,23 +87,51 @@ class ScalpAlgo:
 
         now = self._now()
         order = self._order
-        if (order is not None and
-            order.side == 'buy' and now -
-                pd.Timestamp(order.submitted_at, tz='America/New_York') > pd.Timedelta('2 min')):
-            last_price = self._api.polygon.last_trade(self._symbol).price
-            self._l.info(
-                f'canceling missed buy order {order.id} at {order.limit_price} '
-                f'(current price = {last_price})')
-            self._cancel_order()
+        elapsed = int((now - self._order.created_at.tz_convert(tz='America/New_York')).total_seconds())
+        if self._state == 'SELL_SUBMITTED':
+            if order is None:
+                self._l.warn(f'state {self._state} mismatch order {self._order}')
+                return
+            if order.type != 'limit':
+                return
+            elif elapsed > self._timeDelta:
+                self._cancel_order()
+                self._submit_sell(bailout=True)
+            else:
+                new_price = self._lastTrade.price - elapsed/100
+                self._replace_order_price(new_price)
+        if self._state == 'COVER_SUBMITTED':
+            if order is None:
+                self._l.warn(f'state {self._state} mismatch order {self._order}')
+                return
+            if order.type != 'limit':
+                return
+            elif elapsed > self._timeDelta:
+                self._cancel_order()
+                self._submit_buy(bailout=True)
+            else:
+                new_price = self._lastTrade.price + elapsed/100
+                self._replace_order_price(new_price)
 
         if self._position is not None and self._outofmarket():
-            self._submit_sell(bailout=True)
+            if self._position == 'long':
+                self._submit_sell(bailout=True)
+            elif self._position == 'short':
+                self._submit_buy(bailout=True)
+            else:
+                self._l.warn(f'out of market but position {self._position} side unknown')
 
     def _cancel_order(self):
         if self._order is not None:
-            self._api.cancel_order(self._order.id)
+            try:
+                self._api.cancel_order(self._order.id)
+            except Exception as e:
+                if hasattr(e,'status_code'):
+                    self._l.info(f'Cancel failed with error {e.status_code}: {e}')
+                else:
+                    self._l.info(f'Cancel failed with error {e}')
 
-    def _calc_buy_signal(self):
+    def _calc_long_signal(self):
         for i in range(1,self._timeDelta+1):
             if self._sbars.open[-i] >= self._sbars.close[-i]:
                 return False
@@ -103,7 +149,7 @@ class ScalpAlgo:
                 return False
             if self._sbars.high[-1] < self._sbars.low[-i]:
                 self._l.info(
-                    f'buy signal: high {self._sbars.high[-1]} < low {i} seconds ago {self._sbars.low[-i]}'
+                    f'short signal: high {self._sbars.high[-1]} < low {i} seconds ago {self._sbars.low[-i]}'
                 )
                 return True
         else:
@@ -127,10 +173,17 @@ class ScalpAlgo:
             self._order = None
             if self._state == 'BUY_SUBMITTED':
                 self._position = self._api.get_position(self._symbol)
-                self._transition('TO_SELL')
-                self._submit_sell()
+                self._transition('LONG')
                 return
             elif self._state == 'SELL_SUBMITTED':
+                self._position = None
+                self._transition('NEUTRAL')
+                return
+            elif self._state == 'SHORT_SUBMITTED':
+                self._position = self._api.get_position(self._symbol)
+                self._transition('SHORT')
+                return
+            elif self._state == 'COVER_SUBMITTED':
                 self._position = None
                 self._transition('NEUTRAL')
                 return
@@ -144,13 +197,20 @@ class ScalpAlgo:
             self._order = None
             if self._state == 'BUY_SUBMITTED':
                 if self._position is not None:
-                    self._transition('TO_SELL')
-                    self._submit_sell()
+                    self._transition('LONG')
                 else:
                     self._transition('NEUTRAL')
             elif self._state == 'SELL_SUBMITTED':
                 self._transition('TO_SELL')
                 self._submit_sell(bailout=True)
+            elif self._state == 'SHORT_SUBMITTED':
+                if self._position is not None:
+                    self._transition('SHORT')
+                else:
+                    self._transition('NEUTRAL')
+            elif self._state == 'COVER_SUBMITTED':
+                self._transition('TO_COVER')
+                self._submit_buy(bailout=True)
             else:
                 self._l.warn(f'unexpected state for {event}: {self._state}')
 
@@ -169,13 +229,66 @@ class ScalpAlgo:
             return
         if self._outofmarket():
             return
+        long_signal = self._calc_long_signal()
+        short_signal = self._calc_short_signal()
+        order = self._order
         if self._state == 'NEUTRAL':
-            signal = self._calc_buy_signal()
-            if signal:
+            if long_signal:
+                self._transition('TO_BUY')
                 self._submit_buy()
+            elif short_signal:
+                self._transition('TO_SHORT')
+                self._submit_sell()
+        if self._state == 'BUY_SUBMITTED':
+            if (long_signal and order is not None
+                and order.side == 'buy'
+                and self._lastTrade.price > order.limit_price):
+                self._l.info(
+                    f'adjusting long order {order.id} at {order.limit_price} '
+                    f'(current price = {self._lastTrade.price})')
+                self._replace_order_price(self._lastTrade.price)
+            elif not long_signal:
+                self._l.info(
+                    f'long order {order.id} no longer good; '
+                    f'attempting to cancel')
+                self._cancel_order()
+        if self._state == 'SHORT_SUBMITTED':
+            if (short_signal and order is not None
+                and order.side == 'sell'
+                and self._lastTrade.price < order.limit_price):
+                self._l.info(
+                    f'adjusting short order {order.id} at {order.limit_price} '
+                    f'(current price = {self._lastTrade.price})')
+                self._replace_order_price(self._lastTrade.price)
+            elif not short_signal:
+                self._l.info(
+                    f'short order {order.id} no longer good; '
+                    f'attempting to cancel')
+                self._cancel_order()
 
     def on_trade(self, trade):
         self._lastTrade = trade
+    
+    def _replace_order_price(self, new_price):
+        if self._order is None:
+            return
+        old_order = self._order
+        try:
+            order = self._api.replace_order(
+                order_id=self._order.id,
+                limit_price=new_price,
+            )
+        except Exception as e:
+            if hasattr(e,'status_code'):
+                self._l.info(f'Replace failed with error {e.status_code}: {e}')
+            else:
+                self._l.info(f'Replace failed with error {e}')
+            return
+        self._order = order
+        self._l.info(
+            f'order {order} replaces {order.replaces}; '
+            f'new limit price {new_price} replaces old limit price {old_order.price}'
+        )
     
     def _submit_buy(self, bailout=False):
         if not self._isTradable:
@@ -203,18 +316,23 @@ class ScalpAlgo:
             order = self._api.submit_order(**params)
         except Exception as e:
             if hasattr(e,'status_code'):
-                self._l.info(f'Error {e.status_code}: {e}')
+                self._l.info(f'Buy failed with error {e.status_code}: {e}')
             else:
-                self._l.info(e)
+                self._l.info(f'Buy failed with error {e}')
             if self._position is not None and self._position.side == 'short':
-                self._transition('TO_BUY')
+                self._transition('SHORT')
             else:
                 self._transition('NEUTRAL')
             return
 
         self._order = order
         self._l.info(f'submitted {order.type} buy {order}')
-        self._transition('BUY_SUBMITTED')
+        if self._state == 'NEUTRAL':
+            self._transition('BUY_SUBMITTED')
+        elif self._state == 'SHORT':
+            self._transition('COVER_SUBMITTED')
+        else:
+            self._l.warn(f'state {self._state} mismatch order {order}')
 
     def _submit_sell(self, bailout=False):
         if not self._isTradable:
@@ -246,18 +364,23 @@ class ScalpAlgo:
             order = self._api.submit_order(**params)
         except Exception as e:
             if hasattr(e,'status_code'):
-                self._l.info(f'Error {e.status_code}: {e}')
+                self._l.info(f'Sell failed with error {e.status_code}: {e}')
             else:
-                self._l.info(e)
+                self._l.info(f'Sell failed with error {e}')
             if self._position is not None and self._position.side == 'long':
-                self._transition('TO_SELL')
+                self._transition('LONG')
             else:
                 self._transition('NEUTRAL')
             return
 
         self._order = order
         self._l.info(f'submitted {order.type} sell {order}')
-        self._transition('SELL_SUBMITTED')
+        if self._state == 'NEUTRAL':
+            self._transition('SHORT_SUBMITTED')
+        elif self._state == 'LONG':
+            self._transition('SELL_SUBMITTED')
+        else:
+            self._l.warn(f'state {self._state} mismatch order {order}')
 
     def _transition(self, new_state):
         self._l.info(f'transition from {self._state} to {new_state}')
@@ -317,7 +440,7 @@ def main(args):
             for symbol, algo in fleet.items():
                 pos = [p for p in positions if p.symbol == symbol]
                 algo.checkup(pos[0] if len(pos) > 0 else None)
-            await asyncio.sleep(2)
+            await asyncio.sleep(1)
 
     channels = ['trade_updates'] + ['account_updates'] + [
         'AM.' + symbol for symbol in symbols
