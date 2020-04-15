@@ -237,7 +237,7 @@ class PriceActionAlgo:
             return False
 
     def on_mbar(self, mbar):
-        self._mbars = self._mbars.append(pd.DataFrame({
+        self._mbars.append(pd.DataFrame({
             'open': mbar.open,
             'high': mbar.high,
             'low': mbar.low,
