@@ -320,7 +320,7 @@ class PriceActionAlgo:
         now = self._now()
         # self._sbars = self._sbars[(now - pd.Timedelta(self._timeDelta,units="seconds")):]
 
-        if len(self._sbars) < self._timeDelta:
+        if self._sbars is None or len(self._sbars) < self._timeDelta:
             return
         if self._outofmarket():
             return
