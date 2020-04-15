@@ -20,8 +20,8 @@ class PriceActionAlgo:
         self._account = self._api.get_account()
         self._canShort = self._account.shorting_enabled
         self._timeDelta = timeDelta
-        self._mbars = []
-        self._sbars = []
+        self._mbars = pd.DataFrame()
+        self._sbars = pd.DataFrame()
         self._lastTrade = self._api.polygon.last_trade(self._symbol)
         self._l = logger.getChild(self._symbol)
 
