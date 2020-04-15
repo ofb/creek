@@ -137,14 +137,14 @@ class PriceActionAlgo:
             position.side != 'short' or self._state != 'SHORT'):
             return False
         ep = position.avg_entry_price
-        if ep < self._sbars.close[-1]:
+        if ep < self._sbars[-1].close:
             return True
         min = self._calc_position_min(entered)
         delta = ep - min
         if delta < 0:
             return True
         ceiling = self._calc_cover_threshold(ep, delta)
-        if ceiling < self._sbars.close[-1]:
+        if ceiling < self._sbars[-1].close:
             return True
         else:
             return False
@@ -168,11 +168,11 @@ class PriceActionAlgo:
 
     def _calc_long_signal(self):
         for i in range(1,self._timeDelta+1):
-            if self._sbars.open[-i] >= self._sbars.close[-i]:
+            if self._sbars[-i].open >= self._sbars[-i].close:
                 return False
-            if self._sbars.low[-1] > self._sbars.high[-i]:
+            if self._sbars[-1].low > self._sbars[-i].high:
                 self._l.info(
-                    f'buy signal: low {self._sbars.low[-1]} > high {i} seconds ago {self._sbars.high[-i]}'
+                    f'buy signal: low {self._sbars[-1].low} > high {i} seconds ago {self._sbars[-i].high}'
                 )
                 return True
         else:
@@ -195,14 +195,14 @@ class PriceActionAlgo:
             position.side != 'long' or self._state != 'LONG'):
             return False
         ep = position.avg_entry_price
-        if ep > self._sbars.close[-1]:
+        if ep > self._sbars[-1].close:
             return True
         max = self._calc_position_max(entered)
         delta = max - ep
         if delta < 0:
             return True
         floor = self._calc_sell_threshold(ep, delta)
-        if floor > self._sbars.close[-1]:
+        if floor > self._sbars[-1].close:
             return True
         else:
             return False
@@ -226,11 +226,11 @@ class PriceActionAlgo:
 
     def _calc_short_signal(self):
         for i in range(1,self._timeDelta+1):
-            if self._sbars.open[-i] <= self._sbars.close[-i]:
+            if self._sbars[-i].open <= self._sbars[-i].close:
                 return False
-            if self._sbars.high[-1] < self._sbars.low[-i]:
+            if self._sbars[-1].high < self._sbars[-i].low:
                 self._l.info(
-                    f'short signal: high {self._sbars.high[-1]} < low {i} seconds ago {self._sbars.low[-i]}'
+                    f'short signal: high {self._sbars[-1].high} < low {i} seconds ago {self._sbars[-i].low}'
                 )
                 return True
         else:
