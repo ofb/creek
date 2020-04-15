@@ -137,14 +137,14 @@ class PriceActionAlgo:
             position.side != 'short' or self._state != 'SHORT'):
             return False
         ep = position.avg_entry_price
-        if ep < self._sbars[-1].close:
+        if ep < self._sbars.close[-1]:
             return True
         min = self._calc_position_min(entered)
         delta = ep - min
         if delta < 0:
             return True
         ceiling = self._calc_cover_threshold(ep, delta)
-        if ceiling < self._sbars[-1].close:
+        if ceiling < self._sbars.close[-1]:
             return True
         else:
             return False
@@ -168,11 +168,11 @@ class PriceActionAlgo:
 
     def _calc_long_signal(self):
         for i in range(1,self._timeDelta+1):
-            if self._sbars[-i].open >= self._sbars[-i].close:
+            if self._sbars.open[-i] >= self._sbars.close[-i]:
                 return False
-            if self._sbars[-1].low > self._sbars[-i].high:
+            if self._sbars.low[-1] > self._sbars.high[-i]:
                 self._l.info(
-                    f'buy signal: low {self._sbars[-1].low} > high {i} seconds ago {self._sbars[-i].high}'
+                    f'buy signal: low {self._sbars.low[-1]} > high {i} seconds ago {self._sbars.high[-i]}'
                 )
                 return True
         else:
@@ -195,14 +195,14 @@ class PriceActionAlgo:
             position.side != 'long' or self._state != 'LONG'):
             return False
         ep = position.avg_entry_price
-        if ep > self._sbars[-1].close:
+        if ep > self._sbars.close[-1]:
             return True
         max = self._calc_position_max(entered)
         delta = max - ep
         if delta < 0:
             return True
         floor = self._calc_sell_threshold(ep, delta)
-        if floor > self._sbars[-1].close:
+        if floor > self._sbars.close[-1]:
             return True
         else:
             return False
@@ -226,18 +226,18 @@ class PriceActionAlgo:
 
     def _calc_short_signal(self):
         for i in range(1,self._timeDelta+1):
-            if self._sbars[-i].open <= self._sbars[-i].close:
+            if self._sbars.open[-i] <= self._sbars.close[-i]:
                 return False
-            if self._sbars[-1].high < self._sbars[-i].low:
+            if self._sbars.high[-1] < self._sbars.low[-i]:
                 self._l.info(
-                    f'short signal: high {self._sbars[-1].high} < low {i} seconds ago {self._sbars[-i].low}'
+                    f'short signal: high {self._sbars.high[-1]} < low {i} seconds ago {self._sbars.low[-i]}'
                 )
                 return True
         else:
             return False
 
     def on_mbar(self, mbar):
-        self._mbars.append(pd.DataFrame({
+        self._mbars = self._mbars.append(pd.DataFrame({
             'open': mbar.open,
             'high': mbar.high,
             'low': mbar.low,
@@ -310,7 +310,7 @@ class PriceActionAlgo:
                 self._l.warn(f'unexpected state for {event}: {self._state}')
 
     def on_sbar(self, sbar):
-        self._sbars.append(pd.DataFrame({
+        self._sbars = self._sbars.append(pd.DataFrame({
             'open': sbar.open,
             'high': sbar.high,
             'low': sbar.low,
