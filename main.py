@@ -283,6 +283,9 @@ class PriceActionAlgo:
                 self._positionTimestamp = now
             self._order = self._api.get_order(order['id'])
             return
+        elif event == 'replaced':
+            self._order = self._api.get_order(order['id'])
+            return
         elif event in ('canceled', 'rejected'):
             if event == 'rejected':
                 self._l.warn(f'order rejected: current order = {self._order}')
