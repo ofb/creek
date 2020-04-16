@@ -89,7 +89,8 @@ class PriceActionAlgo:
     def checkup(self):
         now = self._now()
         order = self._order
-        elapsed = int((now - self._order.created_at.tz_convert(tz='America/New_York')).total_seconds())
+        if order is not None:
+            elapsed = int((now - self._order.created_at.tz_convert(tz='America/New_York')).total_seconds())
         if self._state == 'SELL_SUBMITTED':
             if order is None:
                 self._l.warn(f'state {self._state} mismatch order {self._order}')
