@@ -415,7 +415,7 @@ class PriceActionAlgo:
         self._order = order
         self._l.info(
             f'order {order} submitted to replace {order.replaces}; '
-            f'new limit price {new_price} to replace old limit price {old_order.price}'
+            f'new limit price {new_price} to replace old limit price {old_order.limit_price}'
         )
     
     def _submit_buy(self, bailout=False):
