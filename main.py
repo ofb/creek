@@ -136,6 +136,7 @@ class PriceActionAlgo:
         entered = self._positionTimestamp
         if (position is None or entered is None or
             position.side != 'short' or self._state != 'SHORT'):
+            self._l.info('_calc_cover_signal conditions not met')
             return False
         ep = float(position.avg_entry_price)
         if ep < self._sbars.close[-1]:
@@ -147,7 +148,9 @@ class PriceActionAlgo:
         ceiling = self._calc_cover_threshold(ep, delta)
         if ceiling < self._sbars.close[-1]:
             return True
+            self._l.info(f'_calc_cover_signal = True: {ceiling} < {self._sbars.close[-1]}')
         else:
+            self._l.info(f'_calc_cover_signal = False: {ceiling} >= {self._sbars.close[-1]}')
             return False
 
     def _calc_cover_threshold(self, ep, delta):
@@ -194,6 +197,7 @@ class PriceActionAlgo:
         entered = self._positionTimestamp
         if (position is None or entered is None or
             position.side != 'long' or self._state != 'LONG'):
+            self._l.info('_calc_sell_signal conditions not met')
             return False
         ep = float(position.avg_entry_price)
         if ep > self._sbars.close[-1]:
@@ -204,8 +208,10 @@ class PriceActionAlgo:
             return True
         floor = self._calc_sell_threshold(ep, delta)
         if floor > self._sbars.close[-1]:
+            self._l.info(f'_calc_sell_signal = True: {floor} > {self._sbars.close[-1]}')
             return True
         else:
+            self._l.info(f'_calc_sell_signal = False: {floor} <= {self._sbars.close[-1]}')
             return False
 
     def _calc_sell_threshold(self, ep, delta):
@@ -417,7 +423,7 @@ class PriceActionAlgo:
             self._transition('NEUTRAL')
             return
         if self._position is not None and self._position.side == 'short':
-            amount = abs(self._position.qty)
+            amount = abs(float(self._position.qty))
         else:
             amount = int(self._lot / self._lastTrade.price)
         params = dict(
@@ -469,7 +475,7 @@ class PriceActionAlgo:
             self._transition('NEUTRAL')
             return
         if self._position is not None and self._position.side == 'long':
-            amount = self._position.qty
+            amount = float(self._position.qty)
         else:
             amount = int(self._lot / self._lastTrade.price)
         params = dict(
