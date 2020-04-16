@@ -457,7 +457,7 @@ class PriceActionAlgo:
         self._l.info(f'submitted {order.type} buy {order}')
         if self._state == 'TO_BUY':
             self._transition('BUY_SUBMITTED')
-        elif self._state == 'SHORT':
+        elif self._state == 'TO_COVER':
             self._transition('COVER_SUBMITTED')
         else:
             self._l.warn(f'state {self._state} mismatch order {order}')
@@ -509,7 +509,7 @@ class PriceActionAlgo:
         self._l.info(f'submitted {order.type} sell {order}')
         if self._state == 'TO_SHORT':
             self._transition('SHORT_SUBMITTED')
-        elif self._state == 'LONG':
+        elif self._state == 'TO_SELL':
             self._transition('SELL_SUBMITTED')
         else:
             self._l.warn(f'state {self._state} mismatch order {order}')
