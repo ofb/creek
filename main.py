@@ -448,7 +448,7 @@ class PriceActionAlgo:
 
         self._order = order
         self._l.info(f'submitted {order.type} buy {order}')
-        if self._state == 'NEUTRAL':
+        if self._state == 'TO_BUY':
             self._transition('BUY_SUBMITTED')
         elif self._state == 'SHORT':
             self._transition('COVER_SUBMITTED')
@@ -500,7 +500,7 @@ class PriceActionAlgo:
 
         self._order = order
         self._l.info(f'submitted {order.type} sell {order}')
-        if self._state == 'NEUTRAL':
+        if self._state == 'TO_SHORT':
             self._transition('SHORT_SUBMITTED')
         elif self._state == 'LONG':
             self._transition('SELL_SUBMITTED')
