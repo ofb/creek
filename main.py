@@ -137,7 +137,7 @@ class PriceActionAlgo:
         if (position is None or entered is None or
             position.side != 'short' or self._state != 'SHORT'):
             return False
-        ep = position.avg_entry_price
+        ep = float(position.avg_entry_price)
         if ep < self._sbars.close[-1]:
             return True
         min = self._calc_position_min(entered)
@@ -195,7 +195,7 @@ class PriceActionAlgo:
         if (position is None or entered is None or
             position.side != 'long' or self._state != 'LONG'):
             return False
-        ep = position.avg_entry_price
+        ep = float(position.avg_entry_price)
         if ep > self._sbars.close[-1]:
             return True
         max = self._calc_position_max(entered)
