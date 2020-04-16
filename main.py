@@ -342,7 +342,7 @@ class PriceActionAlgo:
         elif self._state == 'BUY_SUBMITTED':
             if (long_signal and order is not None
                 and order.side == 'buy'
-                and sbar.close > order.limit_price):
+                and sbar.close > float(order.limit_price)):
                 self._l.info(
                     f'adjusting long order {order.id} at {order.limit_price} '
                     f'(current price = {self._lastTrade.price})')
@@ -358,7 +358,7 @@ class PriceActionAlgo:
         elif self._state == 'SHORT_SUBMITTED':
             if (short_signal and order is not None
                 and order.side == 'sell'
-                and sbar.close < order.limit_price):
+                and sbar.close < float(order.limit_price)):
                 self._l.info(
                     f'adjusting short order {order.id} at {order.limit_price} '
                     f'(current price = {self._lastTrade.price})')
