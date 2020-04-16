@@ -333,6 +333,7 @@ class PriceActionAlgo:
             return
         long_signal = self._calc_long_signal()
         short_signal = self._calc_short_signal()
+        self._l.info(f'current state: {self._state}')
         order = self._order
         if self._state == 'NEUTRAL':
             if long_signal:
