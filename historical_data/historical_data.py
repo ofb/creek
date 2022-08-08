@@ -22,7 +22,7 @@ url_v2 = 'https://paper-api.alpaca.markets/v2/'
 
 handler = logging.handlers.WatchedFileHandler(
     os.environ.get("LOGFILE", "historical_data.log"))
-formatter = logging.Formatter(logging.BASIC_FORMAT)
+formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s:%(message)s")
 handler.setFormatter(formatter)
 logger = logging.getLogger(__name__)
 logger.setLevel(os.environ.get("LOGLEVEL", "INFO"))
@@ -95,18 +95,18 @@ def get_shortable_equity_list():
 def main():
 #  shortable_list = get_shortable_equity_list();
 #  shortable_list.to_csv('shortable_equity_list.csv')
-  shortable_list_df = pd.read_csv('shortable_equity_list_in_progress.csv')
+  shortable_list_df = pd.read_csv('shortable_equity_list_todo.csv')
   shortable_list = shortable_list_df['symbol'].tolist()
   processed_list_df = pd.read_csv('shortable_equity_list_processed.csv')
   processed_list = processed_list_df['symbol'].tolist()
   for i in range(min(10,len(shortable_list))):
     symbol = shortable_list.pop(0)
+    logger.info('Fetching symbol %s', symbol)
     bars = compile_bars(symbol,10)
-    logger.info('symbol %s', symbol)
-    bars.to_csv('data/%s.csv' % symbol)
+    bars.to_csv('/mnt/disks/creek-1/us_equities/%s.csv' % symbol)
     processed_list.append(symbol)
   updated_symbol_list = pd.DataFrame({'symbol': shortable_list})
-  updated_symbol_list.to_csv('shortable_equity_list_in_progress.csv')
+  updated_symbol_list.to_csv('shortable_equity_list_todo.csv')
   processed_symbol_list = pd.DataFrame({'symbol': processed_list})
   processed_symbol_list.to_csv('shortable_equity_list_processed.csv')
 
