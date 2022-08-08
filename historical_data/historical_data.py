@@ -11,7 +11,7 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.common.exceptions import APIError
 # keys required for stock historical data client
-# this are the paper trading keys
+# these are the paper trading keys
 client = StockHistoricalDataClient('PK52PMRHMCY15OZGMZLW', 'F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh')
 headers = {
       'APCA-API-KEY-ID':'PK52PMRHMCY15OZGMZLW',
@@ -99,9 +99,10 @@ def main():
   shortable_list = shortable_list_df['symbol'].tolist()
   processed_list_df = pd.read_csv('shortable_equity_list_processed.csv')
   processed_list = processed_list_df['symbol'].tolist()
-  for i in range(min(10,len(shortable_list))):
+  limit = min(100,len(shortable_list))
+  for i in range(limit):
     symbol = shortable_list.pop(0)
-    logger.info('Fetching symbol %s', symbol)
+    logger.info('Fetching symbol %s, %s/%s', (symbol, i+1, limit))
     bars = compile_bars(symbol,10)
     bars.to_csv('/mnt/disks/creek-1/us_equities/%s.csv' % symbol)
     processed_list.append(symbol)

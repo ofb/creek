@@ -102,3 +102,109 @@ INFO:__main__:Fetched PRK year 2017
 INFO:__main__:Fetched PRK year 2016
 INFO:__main__:Fetched PRK year 2015
 INFO:__main__:symbol PRK
+2022-08-08 17:25:32,195:INFO:__main__:Fetching symbol CANE
+2022-08-08 17:25:33,835:INFO:__main__:Fetched CANE year 2022
+2022-08-08 17:25:35,812:INFO:__main__:Fetched CANE year 2021
+2022-08-08 17:25:37,200:INFO:__main__:Fetched CANE year 2020
+2022-08-08 17:25:38,090:INFO:__main__:Fetched CANE year 2019
+2022-08-08 17:25:39,162:INFO:__main__:Fetched CANE year 2018
+2022-08-08 17:25:39,629:INFO:__main__:Fetched CANE year 2017
+2022-08-08 17:25:39,841:INFO:__main__:Fetched CANE year 2016
+2022-08-08 17:25:39,900:INFO:__main__:Fetched CANE year 2015
+2022-08-08 17:25:41,604:INFO:__main__:Fetching symbol EBR
+2022-08-08 17:25:48,722:INFO:__main__:Fetched EBR year 2022
+2022-08-08 17:25:59,707:INFO:__main__:Fetched EBR year 2021
+2022-08-08 17:26:10,881:INFO:__main__:Fetched EBR year 2020
+2022-08-08 17:26:23,650:INFO:__main__:Fetched EBR year 2019
+2022-08-08 17:26:40,643:INFO:__main__:Fetched EBR year 2018
+2022-08-08 17:26:56,829:INFO:__main__:Fetched EBR year 2017
+2022-08-08 17:26:57,847:INFO:__main__:Fetched EBR year 2016
+2022-08-08 17:26:57,877:WARNING:__main__:Empty request
+2022-08-08 17:26:57,985:INFO:__main__:Fetched EBR year 2015
+2022-08-08 17:27:54,235:INFO:__main__:Fetching symbol CULL
+2022-08-08 17:27:54,326:INFO:__main__:Fetched CULL year 2022
+2022-08-08 17:27:54,495:INFO:__main__:Fetched CULL year 2021
+2022-08-08 17:27:54,522:WARNING:__main__:Empty request
+2022-08-08 17:27:54,525:INFO:__main__:Fetched CULL year 2020
+2022-08-08 17:27:54,552:WARNING:__main__:Empty request
+2022-08-08 17:27:54,554:INFO:__main__:Fetched CULL year 2019
+2022-08-08 17:27:54,580:WARNING:__main__:Empty request
+2022-08-08 17:27:54,583:INFO:__main__:Fetched CULL year 2018
+2022-08-08 17:27:54,609:WARNING:__main__:Empty request
+2022-08-08 17:27:54,611:INFO:__main__:Fetched CULL year 2017
+2022-08-08 17:27:54,640:WARNING:__main__:Empty request
+2022-08-08 17:27:54,642:INFO:__main__:Fetched CULL year 2016
+2022-08-08 17:27:54,674:WARNING:__main__:Empty request
+2022-08-08 17:27:54,677:INFO:__main__:Fetched CULL year 2015
+2022-08-08 17:27:54,698:INFO:__main__:Fetching symbol MOFG
+2022-08-08 17:27:55,342:INFO:__main__:Fetched MOFG year 2022
+2022-08-08 17:27:56,896:INFO:__main__:Fetched MOFG year 2021
+2022-08-08 17:27:58,841:INFO:__main__:Fetched MOFG year 2020
+2022-08-08 17:28:00,107:INFO:__main__:Fetched MOFG year 2019
+2022-08-08 17:28:01,363:INFO:__main__:Fetched MOFG year 2018
+2022-08-08 17:28:03,020:INFO:__main__:Fetched MOFG year 2017
+2022-08-08 17:28:03,972:INFO:__main__:Fetched MOFG year 2016
+2022-08-08 17:28:04,074:INFO:__main__:Fetched MOFG year 2015
+2022-08-08 17:28:06,618:INFO:__main__:Fetching symbol EBTC
+2022-08-08 17:28:06,843:INFO:__main__:Fetched EBTC year 2022
+2022-08-08 17:28:07,496:INFO:__main__:Fetched EBTC year 2021
+2022-08-08 17:28:08,107:INFO:__main__:Fetched EBTC year 2020
+2022-08-08 17:28:08,509:INFO:__main__:Fetched EBTC year 2019
+2022-08-08 17:28:09,037:INFO:__main__:Fetched EBTC year 2018
+2022-08-08 17:28:09,633:INFO:__main__:Fetched EBTC year 2017
+2022-08-08 17:28:10,279:INFO:__main__:Fetched EBTC year 2016
+2022-08-08 17:28:10,338:INFO:__main__:Fetched EBTC year 2015
+2022-08-08 17:28:10,919:INFO:__main__:Fetching symbol CVLG
+2022-08-08 17:28:13,523:INFO:__main__:Fetched CVLG year 2022
+2022-08-08 17:28:17,609:INFO:__main__:Fetched CVLG year 2021
+2022-08-08 17:28:23,201:INFO:__main__:Fetched CVLG year 2020
+2022-08-08 17:28:28,189:INFO:__main__:Fetched CVLG year 2019
+2022-08-08 17:28:33,965:INFO:__main__:Fetched CVLG year 2018
+2022-08-08 17:28:41,741:INFO:__main__:Fetched CVLG year 2017
+2022-08-08 17:28:57,220:INFO:__main__:Fetched CVLG year 2016
+2022-08-08 17:28:57,752:INFO:__main__:Fetched CVLG year 2015
+2022-08-08 17:29:22,826:INFO:__main__:Fetching symbol CWEN.A
+2022-08-08 17:29:25,992:INFO:__main__:Fetched CWEN.A year 2022
+2022-08-08 17:29:32,317:INFO:__main__:Fetched CWEN.A year 2021
+2022-08-08 17:29:38,621:INFO:__main__:Fetched CWEN.A year 2020
+2022-08-08 17:29:51,828:INFO:__main__:Fetched CWEN.A year 2019
+2022-08-08 17:29:53,987:INFO:__main__:Fetched CWEN.A year 2018
+2022-08-08 17:29:54,014:WARNING:__main__:Empty request
+2022-08-08 17:29:54,056:INFO:__main__:Fetched CWEN.A year 2017
+2022-08-08 17:29:54,083:WARNING:__main__:Empty request
+2022-08-08 17:29:54,126:INFO:__main__:Fetched CWEN.A year 2016
+2022-08-08 17:29:54,154:WARNING:__main__:Empty request
+2022-08-08 17:29:54,197:INFO:__main__:Fetched CWEN.A year 2015
+2022-08-08 17:30:07,934:INFO:__main__:Fetching symbol DBO
+2022-08-08 17:30:15,941:INFO:__main__:Fetched DBO year 2022
+2022-08-08 17:30:41,803:INFO:__main__:Fetched DBO year 2021
+2022-08-08 17:31:04,516:INFO:__main__:Fetched DBO year 2020
+2022-08-08 17:31:22,388:INFO:__main__:Fetched DBO year 2019
+2022-08-08 17:31:40,120:INFO:__main__:Fetched DBO year 2018
+2022-08-08 17:31:55,894:INFO:__main__:Fetched DBO year 2017
+2022-08-08 17:32:12,574:INFO:__main__:Fetched DBO year 2016
+2022-08-08 17:32:13,250:INFO:__main__:Fetched DBO year 2015
+2022-08-08 17:33:19,172:INFO:__main__:Fetching symbol DFAC
+2022-08-08 17:33:24,966:INFO:__main__:Fetched DFAC year 2022
+2022-08-08 17:33:28,822:INFO:__main__:Fetched DFAC year 2021
+2022-08-08 17:33:28,848:WARNING:__main__:Empty request
+2022-08-08 17:33:28,864:INFO:__main__:Fetched DFAC year 2020
+2022-08-08 17:33:28,891:WARNING:__main__:Empty request
+2022-08-08 17:33:28,909:INFO:__main__:Fetched DFAC year 2019
+2022-08-08 17:33:28,932:WARNING:__main__:Empty request
+2022-08-08 17:33:28,948:INFO:__main__:Fetched DFAC year 2018
+2022-08-08 17:33:28,974:WARNING:__main__:Empty request
+2022-08-08 17:33:28,992:INFO:__main__:Fetched DFAC year 2017
+2022-08-08 17:33:29,019:WARNING:__main__:Empty request
+2022-08-08 17:33:29,034:INFO:__main__:Fetched DFAC year 2016
+2022-08-08 17:33:29,061:WARNING:__main__:Empty request
+2022-08-08 17:33:29,078:INFO:__main__:Fetched DFAC year 2015
+2022-08-08 17:33:31,478:INFO:__main__:Fetching symbol HVT
+2022-08-08 17:33:35,030:INFO:__main__:Fetched HVT year 2022
+2022-08-08 17:33:41,646:INFO:__main__:Fetched HVT year 2021
+2022-08-08 17:33:47,740:INFO:__main__:Fetched HVT year 2020
+2022-08-08 17:33:53,142:INFO:__main__:Fetched HVT year 2019
+2022-08-08 17:33:57,300:INFO:__main__:Fetched HVT year 2018
+2022-08-08 17:34:00,883:INFO:__main__:Fetched HVT year 2017
+2022-08-08 17:34:05,828:INFO:__main__:Fetched HVT year 2016
+2022-08-08 17:34:06,193:INFO:__main__:Fetched HVT year 2015
