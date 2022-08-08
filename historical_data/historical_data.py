@@ -102,7 +102,7 @@ def main():
   limit = min(100,len(shortable_list))
   for i in range(limit):
     symbol = shortable_list.pop(0)
-    logger.info('Fetching symbol %s, %s/%s', (symbol, i+1, limit))
+    logger.info('Fetching symbol %s, %s/%s' % (symbol, i+1, limit))
     bars = compile_bars(symbol,10)
     bars.to_csv('/mnt/disks/creek-1/us_equities/%s.csv' % symbol)
     processed_list.append(symbol)
