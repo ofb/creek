@@ -10,6 +10,8 @@
 using namespace std;
 
 // Number of stocks with nonempty data = 5246
+// Number of rows in interpolated database for each stock = 308491
+unsigned int databaseRows = 308491;
 // https://www.geeksforgeeks.org/csv-file-management-using-c/
 
 vector<string> get_symbols()
@@ -50,10 +52,10 @@ void get_data(const string& symbol, float* database) {
 		while (getline(ss, word, ',')) {
 			row.push_back(word);
 		}
-		if (row.size() > 1 && counter < 308491) database[counter++] = stof(row[1]);
+		if (row.size() > 1 && counter < databaseRows) database[counter++] = stof(row[1]);
 		else throw runtime_error("Row too short or counter too big");
 	}
-	if (counter != 308491) {
+	if (counter != databaseRows) {
 		cout << "Counter on " << symbol << " is " << counter << endl;
 		throw runtime_error("Database wrong size");
 	}
@@ -71,7 +73,7 @@ int main ()
 	float** database;
 	database = new float*[N];
 	for (int i = 0; i < N; i++) {
-		database[i] = new float[308491];
+		database[i] = new float[databaseRows];
 		get_data(symbols[i], database[i]);
 		cout << "Symbol " << symbols[i] << ": " << endl;
 		for (int j = 0; j < 10; j++) {
