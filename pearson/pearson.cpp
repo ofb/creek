@@ -2,17 +2,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include <array>
+#include <cmath>
 #include <sstream>
 #include <string>
 #include <fstream>
 #include <stdexcept> // std::runtime_error
+#include <chrono>
 using namespace std;
+using namespace std::chrono;
 
 // Number of stocks with nonempty data = 5246
 // Number of rows in interpolated database for each stock = 308491
 unsigned int databaseRows = 308491;
-// https://www.geeksforgeeks.org/csv-file-management-using-c/
+// https://www.gormanalysis.com/blog/reading-and-writing-csv-files-with-cpp/
 
 vector<string> get_symbols()
 {
@@ -62,9 +64,40 @@ void get_data(const string& symbol, float* database) {
 	return;
 }
 
+void pearson(float* x, float* y, float& result) {
+	double sum_x = 0.0, sum_y = 0.0, sum_xy = 0.0;
+	double squaresum_x = 0.0, squaresum_y = 0.0;
+	for (unsigned int i = 0; i < databaseRows; i++) {
+		sum_x += x[i];
+		sum_y += y[i];
+		sum_xy += x[i] * y[i];
+		squaresum_x += x[i] * x[i];
+		squaresum_y += y[i] * y[i];
+	}
+	result = static_cast<float>((databaseRows * sum_xy - sum_x * sum_y)
+						/ sqrt((databaseRows * squaresum_x- sum_x * sum_x)
+							* (databaseRows * squaresum_y - sum_y * sum_y ))
+							);
+	return;
+}
+
+void writeResults(float** results, vector<string>& symbols, const int N) {
+	ofstream myFile("pearson.csv");
+	myFile << "symbol1,symbol2,pearson" << endl;
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N-i-1; j++) {
+			myFile << symbols[i] << "," << symbols[i+j+1] 
+				<< "," << results[i][j] << endl;
+		}
+	}
+	myFile.close();
+	return;
+}
 
 int main ()
 {
+	// Get starting timepoint
+	auto load_start = high_resolution_clock::now();
 	vector<string> symbols;
 	symbols = get_symbols();
 	const int N = static_cast<int>(symbols.size());
@@ -75,12 +108,48 @@ int main ()
 	for (int i = 0; i < N; i++) {
 		database[i] = new float[databaseRows];
 		get_data(symbols[i], database[i]);
-		cout << "Symbol " << symbols[i] << ": " << endl;
-		for (int j = 0; j < 10; j++) {
-			cout << database[i][j] << endl;
+	}
+	// The following 2D array will store our results
+	float** results;
+	results = new float*[N];
+	for (int i = 0; i < N; i++) {
+		results[i] = new float[N-i-1];
+	}
+	// Get ending timepoint
+	auto load_stop = high_resolution_clock::now();
+	auto duration = duration_cast<microseconds>(load_stop - load_start);
+	cout << "Time taken to load databases: "
+			<< duration.count() << " microseconds" << endl;
+	
+	
+	
+	// Get starting timepoint
+	auto start = high_resolution_clock::now();
+	// must complile with openmp: g++ -fopenmp pearson.cpp
+	#pragma omp parallel for
+	for (int i = 0; i < N; i++) {
+		for (int j = 0; j < N-i-1; j++) {
+			pearson(database[i], database[i+j+1], results[i][j]);
 		}
 	}
-	for (int i = 0; i < N; i++) delete[] database[i];
+	// Get ending timepoint
+	auto stop = high_resolution_clock::now();
+	
+	// Get duration. Substart timepoints to
+	// get duration. To cast it to proper unit
+	// use duration cast method
+	duration = duration_cast<microseconds>(stop - start);
+	cout << "Time taken by correlation function: "
+			<< duration.count() << " microseconds" << endl;
+	
+	writeResults(results, symbols, N);
+	
+	
+	for (int i = 0; i < N; i++) {
+		delete[] database[i];
+		delete[] results[i];
+	}
 	delete[] database;
+	delete[] results;
 	return 0;
 }
