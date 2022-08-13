@@ -8,7 +8,7 @@ headers = {
 }
 url_v2 = 'https://paper-api.alpaca.markets/v2/'
 
-def main():
+def initial_sort():
   resp = requests.get(url_v2 + 'assets', headers=headers)
   equity_raw = resp.json()
   symbol_dict = {}
@@ -44,7 +44,14 @@ def main():
   p['symbol1_name'] = p['symbol1'].map(symbol_dict)
   p['symbol2_name'] = p['symbol2'].map(symbol_dict)
   p.to_csv('pearson_9plus.csv')
-  print('Database is %s rows long' % len(p))
+
+def historical_sort():
+  p = pd.read_csv('pearson_9plus_historical.csv')
+  p = p[abs(p['pearson_historical']) >= 0.9]
+  p['abs'] = abs(p['pearson_historical'])
+  p.sort_values(by=['abs'], ascending=False, inplace=True)
+  p.drop(['abs'], axis=1, inplace=True)
+  p.to_csv('pearson_9pplus.csv')
 
 if __name__ == '__main__':
-  main()
+  historical_sort()
