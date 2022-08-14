@@ -13,10 +13,8 @@ headers = {
 }
 url_v2 = 'https://paper-api.alpaca.markets/v2/'
 
-last_year_cutoff = 0.9
-historical_cutoff = 0.9
-
-pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
+last_year_cutoff = 0.99
+historical_cutoff = 0.99
 
 handler = logging.handlers.WatchedFileHandler(
     os.environ.get("LOGFILE", "pearson_historical.log"))
@@ -108,6 +106,7 @@ def pearson_historical():
     logger.error('There were missing bars.')
     return 0
   logger.info('Beginning Pearson correlation computation')
+  pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
   p['pearson_historical'] = p.parallel_apply(pearson, axis=1)
   p = p[['symbol1', 'symbol2', 'pearson', 'pearson_historical', 'symbol1_name', 'symbol2_name']]
   logger.info('Computation complete')
