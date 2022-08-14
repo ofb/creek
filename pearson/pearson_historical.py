@@ -6,6 +6,9 @@ import logging.handlers
 import math
 from pandarallel import pandarallel
 import multiprocessing as mp
+import sys
+import getopt
+
 
 headers = {
       'APCA-API-KEY-ID':'PK52PMRHMCY15OZGMZLW',
@@ -13,8 +16,8 @@ headers = {
 }
 url_v2 = 'https://paper-api.alpaca.markets/v2/'
 
-last_year_cutoff = 0.99
-historical_cutoff = 0.99
+last_year_cutoff = 0.9
+historical_cutoff = 0.9
 
 handler = logging.handlers.WatchedFileHandler(
     os.environ.get("LOGFILE", "pearson_historical.log"))
@@ -29,7 +32,7 @@ p = pd.DataFrame()
 # Frames will be populated with the dataframes for each symbol
 frames = {}
 
-def initial_truncate():
+def initial_truncate(filename):
   resp = requests.get(url_v2 + 'assets', headers=headers)
   equity_raw = resp.json()
   symbol_dict = {}
@@ -54,7 +57,7 @@ def initial_truncate():
       fund_symbols.append(element['symbol'])
 
   global p
-  p = pd.read_csv('pearson.csv')
+  p = pd.read_csv('%s.csv' % filename)
   p = p[abs(p['pearson']) >= last_year_cutoff]
   p = p[~p['symbol1'].isin(fund_symbols)]
   p = p[~p['symbol2'].isin(fund_symbols)]
@@ -119,11 +122,44 @@ def historical_sort():
   p.sort_values(by=['abs'], ascending=False, inplace=True)
   p.drop(['abs'], axis=1, inplace=True)
 
-def main():
-  initial_truncate()
-  r = pearson_historical()
-  if not r: return
-  else: p.to_csv('pearson_historical_truncated.csv')
+def main(argv):
+  arg_refresh = True
+  arg_last_year_cutoff = 0.9
+  arg_historical_cutoff = 0.9
+  arg_help = "{0} -r <refresh> -c <last_year_cutoff> -t <historical_cutoff> (defaults: refresh = 1, last_year_cutoff = 0.9, historical_cutoff = 0.9)".format(argv[0])
+  try:
+    opts, args = getopt.getopt(argv[1:], "hr:c:t:", ["help", "refresh=", "cutoff=", "historical_cutoff="])
+  except:
+    print(arg_help)
+    sys.exit(2)
+
+  for opt, arg in opts:
+    if opt in ("-h", "--help"):
+      print(arg_help)
+      sys.exit(2)
+    elif opt in ("-r", "--refresh"):
+      arg_refresh = bool(eval(arg))
+    elif opt in ("-c", "--cutoff"):
+      arg_last_year_cutoff = float(arg)
+    elif opt in ("-t", "--historical_cutoff"):
+      arg_historical_cutoff = float(arg)
+  global last_year_cutoff
+  global historical_cutoff
+  last_year_cutoff = arg_last_year_cutoff
+  historical_cutoff = arg_historical_cutoff
+  global p
+  if arg_refresh:
+    initial_truncate('pearson')
+    r = pearson_historical()
+    if not r: return
+    historical_sort()
+  else:
+    initial_truncate('pearson_historical')
+    # When importing from csv, the first column is imported as
+    # 'Unnamed: 0'
+    p.drop(['Unnamed: 0'], axis=1, inplace=True)
+    historical_sort()
+  p.to_csv('pearson_historical_truncated.csv')
 
 if __name__ == '__main__':
-  main()
+  main(sys.argv)
