@@ -10,6 +10,8 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.common.exceptions import APIError
+import sys
+import getopt
 # keys required for stock historical data client
 # these are the paper trading keys
 client = StockHistoricalDataClient('PK52PMRHMCY15OZGMZLW', 'F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh')
@@ -92,14 +94,29 @@ def get_shortable_equity_list():
   return pd.DataFrame(shortable_equity_symbols)
 
 
-def main():
+def main(argv):
+  num_symbols = 100
+  arg_help = "{0} -c <number_of_symbols> (default: number_of_symbols = 100)".format(argv[0])
+  try:
+    opts, args = getopt.getopt(argv[1:], "hc:", ["help", "number_of_symbols="])
+  except:
+    print(arg_help)
+    sys.exit(2)
+
+  for opt, arg in opts:
+    if opt in ("-h", "--help"):
+      print(arg_help)
+      sys.exit(2)
+    elif opt in ("-c", "--number_of_symbols"):
+      num_symbols = int(arg)
 #  shortable_list = get_shortable_equity_list();
 #  shortable_list.to_csv('shortable_equity_list.csv')
   shortable_list_df = pd.read_csv('shortable_equity_list_todo.csv')
   shortable_list = shortable_list_df['symbol'].tolist()
   processed_list_df = pd.read_csv('shortable_equity_list_processed.csv')
   processed_list = processed_list_df['symbol'].tolist()
-  limit = min(880,len(shortable_list))
+  limit = min(num_symbols,len(shortable_list))
+  print('Fetching %s symbols' % limit)
   for i in range(limit):
     symbol = shortable_list.pop(0)
     logger.info('Fetching symbol %s, %s/%s' % (symbol, i+1, limit))
@@ -113,4 +130,4 @@ def main():
 
 
 if __name__ == '__main__':
-  main()
+  main(sys.argv)
