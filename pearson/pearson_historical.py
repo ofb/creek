@@ -31,6 +31,7 @@ logger.addHandler(handler)
 p = pd.DataFrame()
 # Frames will be populated with the dataframes for each symbol
 frames = {}
+missing_bars = []
 
 def initial_truncate(filename):
   resp = requests.get(url_v2 + 'assets', headers=headers)
@@ -49,7 +50,11 @@ def initial_truncate(filename):
       fund_symbols.append(element['symbol'])
     if 'Fund' in element['name']:
       fund_symbols.append(element['symbol'])
+    if 'FUND' in element['name']:
+      fund_symbols.append(element['symbol'])
     if 'Trust' in element['name']:
+      fund_symbols.append(element['symbol'])
+    if 'TRUST' in element['name']:
       fund_symbols.append(element['symbol'])
     if 'iShares' in element['name']:
       fund_symbols.append(element['symbol'])
@@ -80,6 +85,21 @@ def pearson(row):
   ysquared = merged['ysquared'].sum()
   return ((n * xy - x * y) / 
 			math.sqrt((n * xsquared - x * x) * (n * ysquared - y * y)))
+			
+def get_frame(symbol):
+  global frames
+  global missing_bars
+  frame = pd.DataFrame()
+  try:
+    frame = pd.read_csv('/mnt/disks/creek-1/us_equities_hourly/%s.csv' % symbol)
+    frame = frame.drop(columns=['symbol','open','high','low','close','volume','trade_count'],axis=1)
+    frame.set_index('timestamp', inplace=True)
+    frame.index = pd.to_datetime(frame.index)
+    frames[symbol] = frame
+  except FileNotFoundError as error:
+    logger.warning('%s.csv not found' % symbol)
+    missing_bars.append(symbol)
+  return
 
 def pearson_historical():
   global p
@@ -89,18 +109,8 @@ def pearson_historical():
   active_symbols.extend(p['symbol2'].tolist())
   active_symbols = set(active_symbols)
   logger.info('Opening %s databases' % len(active_symbols))
-  frame = pd.DataFrame()
-  missing_bars = []
   for symbol in active_symbols:
-    try:
-      frame = pd.read_csv('/mnt/disks/creek-1/us_equities_hourly/%s.csv' % symbol)
-      frame = frame.drop(columns=['symbol','open','high','low','close','volume','trade_count'],axis=1)
-      frame.set_index('timestamp', inplace=True)
-      frame.index = pd.to_datetime(frame.index)
-      frames[symbol] = frame
-    except FileNotFoundError as error:
-      logger.warning('%s.csv not found' % symbol)
-      missing_bars.append(symbol)
+    get_frame(symbol)
   logger.info('Completed loading databases')
   if len(missing_bars) > 0:
     print('There were missing bars. Exiting.')
@@ -163,3 +173,8 @@ def main(argv):
 
 if __name__ == '__main__':
   main(sys.argv)
+  # get_frame('AVB')
+  # get_frame('AIRC')
+  # l = {'symbol1':'AIRC','symbol2':'AVB'}
+  # r = pearson(l)
+  # print(r)
