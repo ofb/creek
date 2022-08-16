@@ -1,3 +1,4 @@
+
 import logging
 import logging.handlers
 import os
@@ -50,7 +51,15 @@ def fetch_bars(stock_request):
       logger.warning('Empty request')
       return pd.DataFrame()
 
-def compile_bars(symbol,number_of_years):
+def compile_bars(symbol, number_of_years, interval):
+  if (interval == 'Minute'): time_frame = TimeFrame.Minute
+  elif (interval == 'Hour'): time_frame = TimeFrame.Hour
+  elif (interval == 'Day'): time_frame = TimeFrame.Day
+  else:
+    try:
+      assert(interval in ['Minute', 'Hour', 'Day']), "Interval must be Minute, Hour, or Day (default Hour)"
+    except Exception as e:
+      print(e)
   current_year = date.today().year
   compiled_bars = pd.DataFrame()
   cutoff = 2015
@@ -59,7 +68,7 @@ def compile_bars(symbol,number_of_years):
   if number_of_years > 0:
     request_params = StockBarsRequest(
                           symbol_or_symbols=symbol,
-                          timeframe=TimeFrame.Minute,
+                          timeframe=time_frame,
                           limit=None,
                           start="%s-01-01" % current_year,
                           end=dayshift_string(5),
@@ -72,7 +81,7 @@ def compile_bars(symbol,number_of_years):
     year = current_year - i
     request_params = StockBarsRequest(
                           symbol_or_symbols=symbol,
-                          timeframe=TimeFrame.Minute,
+                          timeframe=time_frame,
                           limit=None,
                           start="%s-01-01" % year,
                           end="%s-12-31" % year,
@@ -96,9 +105,11 @@ def get_shortable_equity_list():
 
 def main(argv):
   num_symbols = 100
-  arg_help = "{0} -c <number_of_symbols> (default: number_of_symbols = 100)".format(argv[0])
+  interval = 'Hour'
+  years = 10
+  arg_help = "{0} -b <number_of_symbols> -i <interval> -y <number_of_years> (default: number_of_symbols = 100, interval = Hour, number_of_years = 10)".format(argv[0])
   try:
-    opts, args = getopt.getopt(argv[1:], "hc:", ["help", "number_of_symbols="])
+    opts, args = getopt.getopt(argv[1:], "hb:i:y:", ["help", "number_of_symbols=", "interval=", "number_of_years="])
   except:
     print(arg_help)
     sys.exit(2)
@@ -107,26 +118,41 @@ def main(argv):
     if opt in ("-h", "--help"):
       print(arg_help)
       sys.exit(2)
-    elif opt in ("-c", "--number_of_symbols"):
+    elif opt in ("-b", "--number_of_symbols"):
       num_symbols = int(arg)
+    elif opt in ("-i", "--interval"):
+      interval = arg
+    elif opt in ("-y", "--number_of_years"):
+      years = int(arg)
+  if interval not in ['Minute', 'Hour', 'Day']:
+    print('Interval must be Minute, Hour, or Day (default Hour)')
+    sys.exit(2)
+  path_in = input('Enter the path of the directory to save bars in: ')
+  path_in = os.path.expanduser(path_in)
+  if path_in[-1] == '/': path_in = path_in[:-1]
+  try:
+    assert(os.path.isdir(path_in)), 'Invalid path'
+  except Exception as e:
+    print(e)
+    sys.exit(2)
 #  shortable_list = get_shortable_equity_list();
 #  shortable_list.to_csv('shortable_equity_list.csv')
-  shortable_list_df = pd.read_csv('shortable_equity_list_todo.csv')
+  shortable_list_df = pd.read_csv('symbols_%s_todo.csv' % interval)
   shortable_list = shortable_list_df['symbol'].tolist()
-  processed_list_df = pd.read_csv('shortable_equity_list_processed.csv')
+  processed_list_df = pd.read_csv('symbols_%s_processed.csv' % interval)
   processed_list = processed_list_df['symbol'].tolist()
   limit = min(num_symbols,len(shortable_list))
   print('Fetching %s symbols' % limit)
   for i in range(limit):
     symbol = shortable_list.pop(0)
     logger.info('Fetching symbol %s, %s/%s' % (symbol, i+1, limit))
-    bars = compile_bars(symbol,10)
-    bars.to_csv('/mnt/disks/creek-1/us_equities/%s.csv' % symbol)
+    bars = compile_bars(symbol,years,interval)
+    bars.to_csv('%s/%s.csv' % (path_in, symbol))
     processed_list.append(symbol)
   updated_symbol_list = pd.DataFrame({'symbol': shortable_list})
-  updated_symbol_list.to_csv('shortable_equity_list_todo.csv')
+  updated_symbol_list.to_csv('symbols_%s_todo.csv' % interval)
   processed_symbol_list = pd.DataFrame({'symbol': processed_list})
-  processed_symbol_list.to_csv('shortable_equity_list_processed.csv')
+  processed_symbol_list.to_csv('symbols_%s_processed.csv' % interval)
 
 
 if __name__ == '__main__':
