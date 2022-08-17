@@ -45,12 +45,12 @@ def plot_regression(x, y, m, s, symbol1, symbol2):
   plt.legend(loc='center left', fancybox=True, framealpha=0., bbox_to_anchor=(1.05, 0.5))
   plt.savefig('regression/%s-%s.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
 
-def plot_loss(history, symbol1, symbol2):
+def plot_loss(history, symbol1, symbol2, e):
   plt.plot(history.history['loss'], label='loss')
-  plt.ylim(-2,5)
-  plt.xlim(0,25)
-  plt.yticks(np.linspace(-2, 5, 10)[1:])
-  plt.xticks(np.linspace(0, 25, 25)[1:])
+  plt.ylim(-2,15)
+  plt.xlim(0,e)
+  plt.yticks(np.linspace(-2, 15, 17)[1:])
+  plt.xticks(np.linspace(0, e, e)[1:])
   plt.xlabel('Epoch')
   plt.ylabel('Error')
   plt.legend()
@@ -92,7 +92,7 @@ def regress(row):
   # loss = model.evaluate(bars1_np, bars2_np, verbose=2)
   # print("Trained model, loss: %s" % loss)
   model.save_weights('checkpoints/%s-%s' % (symbol1, symbol2))
-  plot_loss(history, symbol1, symbol2)
+  plot_loss(history, symbol1, symbol2, e)
   yhat = model(bars1_np)
   m = yhat.mean()
   s = yhat.stddev()
