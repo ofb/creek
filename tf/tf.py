@@ -1,9 +1,6 @@
 import logging
 import logging.handlers
 import os
-import time
-from datetime import date
-from datetime import timedelta
 import pandas as pd
 import pytz
 import multiprocessing as mp
@@ -17,6 +14,8 @@ tf.enable_v2_behavior()
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 import numpy as np
+import sys
+import getopt
 # keys required for stock historical data client
 # these are the paper trading keys
 client = StockHistoricalDataClient('PK52PMRHMCY15OZGMZLW', 'F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh')
@@ -37,45 +36,6 @@ logger.addHandler(handler)
 
 # This global list will contain the symbols whose datatable is nonempty
 nonempty_list = []
-# Build probabilistic model.
-model = tf.keras.Sequential([
-  tf.keras.layers.Dense(1 + 1),
-  tfp.layers.DistributionLambda(
-      lambda t: tfd.Normal(loc=t[..., :1],
-                scale=1e-3 + tf.math.softplus(0.05 * t[...,1:]))),
-])
-
-def interpolate(symbol):
-  logger.info('Interpolating %s', symbol)
-  bars = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol)
-  if bars.empty:
-    return [symbol,0]
-  interpolated_bars = bars.drop(columns=['symbol','open','high','low','close','volume','trade_count'],axis=1)
-  interpolated_bars.set_index('timestamp', inplace=True)
-  interpolated_bars.index = pd.to_datetime(interpolated_bars.index)
-  # Markets open 2022-01-03 09:30 in US/Eastern
-  market_open_pytz = pd.to_datetime("01-03-2022 9:30")
-  tz_pytz = pytz.timezone("US/Eastern")
-  market_open_pytz = market_open_pytz.tz_localize(tz_pytz)
-  market_open_pytz = market_open_pytz.tz_convert('UTC')
-  market_open_str = market_open_pytz.strftime('%Y-%m-%d %H:%M:%S%z')
-  # Last open day was August 5, 2022
-  market_close_pytz = pd.to_datetime('08-05-2022 16:00')
-  market_close_pytz = market_close_pytz.tz_localize(tz_pytz)
-  market_close_pytz = market_close_pytz.tz_convert('UTC')
-  market_close_str = market_close_pytz.strftime('%Y-%m-%d %H:%M:%S%z')
-  # Interpolate missing minutes
-  # There should be 308491 rows at the end of the interpolation
-  if (interpolated_bars.iloc[0].name > market_open_pytz):
-    interpolated_bars.loc[market_open_pytz] = interpolated_bars.iloc[0]['vwap']
-  if (interpolated_bars.iloc[-1].name < market_close_pytz):
-    interpolated_bars.loc[market_close_pytz] = interpolated_bars.iloc[-1]['vwap']
-  interpolated_bars = interpolated_bars.resample('1T').interpolate('linear')
-  interpolated_bars = interpolated_bars.loc[market_open_str:market_close_str]
-  interpolated_bars.to_csv('/mnt/disks/creek-1/us_equities_2022_interpolated/%s.csv' % symbol) 
-  if (len(interpolated_bars) != 308491):
-    logger.error('Wrong number of bars for %s', symbol)
-  return [symbol,1]
 
 def isempty_callback(result):
   global nonempty_list
@@ -107,28 +67,59 @@ def m():
 
 
 
+def plot_regression(x, y, m, s, symbol1, symbol2):
+  plt.figure(figsize=[15, 15])  # inches
+  plt.plot(x, y, 'b.', label='observed');
 
+  plt.plot(AIRC_np, m, 'r', linewidth=4, label='mean');
+  plt.plot(AIRC_np, m + 2 * s, 'g', linewidth=2, label=r'mean + 2 stddev');
+  plt.plot(AIRC_np, m - 2 * s, 'g', linewidth=2, label=r'mean - 2 stddev');
 
-def plot_loss(history):
+  plt.ylim(np.min(y), np.max(y));
+  plt.yticks(np.linspace(np.min(y), np.max(y), 20)[1:]);
+  plt.xticks(np.linspace(np.min(x), np.max(x), 10)[1:]);
+
+  ax=plt.gca();
+  ax.xaxis.set_ticks_position('bottom')
+  ax.yaxis.set_ticks_position('left')
+  # ax.spines['left'].set_position(('data', 180))
+  ax.spines['top'].set_visible(False)
+  ax.spines['right'].set_visible(False)
+  ax.spines['left'].set_smart_bounds(True)
+  ax.spines['bottom'].set_smart_bounds(True)
+  plt.legend(loc='center left', fancybox=True, framealpha=0., bbox_to_anchor=(1.05, 0.5))
+  plt.savefig('regression/%s-%s.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
+
+def plot_loss(history, symbol1, symbol2):
   plt.plot(history.history['loss'], label='loss')
   plt.xlabel('Epoch')
   plt.ylabel('Error')
   plt.legend()
   plt.grid(True)
-  plt.savefig('loss.png', bbox_inches='tight', dpi=300)
+  plt.savefig('history/%s-%s_loss.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
 
-def perce(row):
-  inpu = np.array([[row['vwap_1']]], dtype=np.float32)
-  val2 = row['vwap_2']
-  mean = np.squeeze(model(inpu).mean().numpy())
-  stddev = np.squeeze(model(inpu).stddev().numpy())
-  return abs(val2 - mean)/stddev
+def main(argv):
+  e = 25
+  arg_help = "{0} -e <epochs> (default: epochs = 25)".format(argv[0])
+  try:
+    opts, args = getopt.getopt(argv[1:], "he:", ["help", "epochs="])
+  except:
+    print(arg_help)
+    sys.exit(2)
 
-def main():
-  global model
-  bars1 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/AIRC.csv')
-  bars2 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/AVB.csv')
+  for opt, arg in opts:
+    if opt in ("-h", "--help"):
+      print(arg_help)
+      sys.exit(2)
+    elif opt in ("-e", "--epochs"):
+      e = int(arg)
+
+  symbol1 = 'AIRC'
+  symbol2 = 'AVB'
+  bars1 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol1)
+  bars2 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol2)
   assert not bars1.empty
+  assert not bars2.empty
   bars1 = bars1.drop(columns=['symbol','open','high','low','close','volume','trade_count'],axis=1)
   bars1.set_index('timestamp', inplace=True)
   bars1.index = pd.to_datetime(bars1.index)
@@ -141,15 +132,27 @@ def main():
   bars2_np = np.array(mbars['vwap_2'], dtype='float32')
   bars2_np = np.expand_dims(bars2_np, axis=1)
   negloglik = lambda y, rv_y: -rv_y.log_prob(y)
+  # Build probabilistic model.
+  model = tf.keras.Sequential([
+    tf.keras.layers.Dense(1 + 1),
+    tfp.layers.DistributionLambda(
+      lambda t: tfd.Normal(loc=t[..., :1],
+                scale=1e-3 + tf.math.softplus(0.05 * t[...,1:]))),
+  ])
   # Do inference.
   model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=negloglik)
-  history = model.fit(bars1_np, bars2_np, epochs=25, verbose=True);
-  plot_loss(history)
+  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=True);
+  plot_loss(history, symbol1, symbol2)
   yhat = model(bars1_np)
   assert isinstance(yhat, tfd.Distribution)
-  mbars['stddev'] = mbars.apply(perce, axis=1)
-  mbars.to_csv('AIRC_AVB_stddev.csv')
+  m = yhat.mean()
+  s = yhat.stddev()
+  plot_regression(bars1_np, bars2_np, m, s, symbol1, symbol2)
+  mbars['mean'] = np.squeeze(m.numpy()).tolist()
+  mbars['stddev'] = np.squeeze(s.numpy()).tolist()
+  mbars['dev'] = abs(mbars['vwap_2'] - mbars['mean'])/mbars['stddev']
+  mbars.to_csv('%s-%s_dev.csv' % (symbol1, symbol2))
   return
 
 if __name__ == '__main__':
-  main()
+  main(sys.argv)
