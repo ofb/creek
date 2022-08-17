@@ -47,9 +47,9 @@ def plot_regression(x, y, m, s, symbol1, symbol2):
 
 def plot_loss(history, symbol1, symbol2):
   plt.plot(history.history['loss'], label='loss')
-  plt.ylim(-0.5,5)
+  plt.ylim(-2,5)
   plt.xlim(0,25)
-  plt.yticks(np.linspace(0, 5, 10)[1:])
+  plt.yticks(np.linspace(-2, 5, 10)[1:])
   plt.xticks(np.linspace(0, 25, 25)[1:])
   plt.xlabel('Epoch')
   plt.ylabel('Error')
