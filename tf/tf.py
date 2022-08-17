@@ -2,13 +2,8 @@ import logging
 import logging.handlers
 import os
 import pandas as pd
-import pytz
 from pandarallel import pandarallel
 import multiprocessing as mp # To get correct number of cpus
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
-from alpaca.common.exceptions import APIError
 import matplotlib.pyplot as plt
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
@@ -18,16 +13,6 @@ import numpy as np
 import sys
 import getopt
 # tf.debugging.set_log_device_placement(True)
-
-# keys required for stock historical data client
-# these are the paper trading keys
-client = StockHistoricalDataClient('PK52PMRHMCY15OZGMZLW', 'F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh')
-headers = {
-      'APCA-API-KEY-ID':'PK52PMRHMCY15OZGMZLW',
-      'APCA-API-SECRET-KEY':'F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh'
-}
-
-url_v2 = 'https://paper-api.alpaca.markets/v2/'
 
 handler = logging.handlers.WatchedFileHandler(
     os.environ.get("LOGFILE", "tf.log"))
@@ -100,7 +85,7 @@ def regress(row):
   ])
   # Do inference.
   model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=negloglik)
-  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=True);
+  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=False);
   plot_loss(history, symbol1, symbol2)
   yhat = model(bars1_np)
   m = yhat.mean()
@@ -129,8 +114,8 @@ def main(argv):
       e = int(arg)
   pearson = pd.read_csv('pearson.csv')
   logger.info('Beginning regression on %s pairs.' % len(pearson))
-  # pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
-  pearson.apply(regress, axis=1)
+  pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
+  pearson.parallel_apply(regress, axis=1)
   # For testing a single symbol
   # d = {'symbol1': 'AIRC', 'symbol2': 'AVB'}
   # d = {'symbol1': 'LILA', 'symbol2': 'LILAK'}
