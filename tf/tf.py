@@ -50,7 +50,7 @@ def plot_loss(history, symbol1, symbol2, e):
   plt.ylim(-2,15)
   plt.xlim(0,e)
   plt.yticks(np.linspace(-2, 15, 17)[1:])
-  plt.xticks(np.linspace(0, e, e)[1:])
+  plt.xticks(np.linspace(0, e, 10)[1:])
   plt.xlabel('Epoch')
   plt.ylabel('Error')
   plt.legend()
@@ -125,6 +125,7 @@ def main(argv):
   # For testing a single symbol
   # d = {'symbol1': 'AIRC', 'symbol2': 'AVB'}
   # d = {'symbol1': 'LILA', 'symbol2': 'LILAK'}
+  # d = {'symbol1': 'FVRR', 'symbol2': 'BLZE'}
   # regress(d)
   logger.info('Regression complete.')
   return
