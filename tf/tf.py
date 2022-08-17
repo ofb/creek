@@ -3,7 +3,8 @@ import logging.handlers
 import os
 import pandas as pd
 import pytz
-import multiprocessing as mp
+from pandarallel import pandarallel
+import multiprocessing as mp # To get correct number of cpus
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
@@ -16,6 +17,8 @@ tfd = tfp.distributions
 import numpy as np
 import sys
 import getopt
+# tf.debugging.set_log_device_placement(True)
+
 # keys required for stock historical data client
 # these are the paper trading keys
 client = StockHistoricalDataClient('PK52PMRHMCY15OZGMZLW', 'F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh')
@@ -34,50 +37,20 @@ logger = logging.getLogger(__name__)
 logger.setLevel(os.environ.get("LOGLEVEL", "INFO"))
 logger.addHandler(handler)
 
-# This global list will contain the symbols whose datatable is nonempty
-nonempty_list = []
-
-def isempty_callback(result):
-  global nonempty_list
-  if result[1]:
-    nonempty_list.append(result[0])
-
-def pool_error_callback(error):
-  logger.error('Pool error: %s', error)
-
-def m():
-  pool = mp.Pool(mp.cpu_count())
-  logger.info('Initializing %s pools', mp.cpu_count())
-  equity_list = pd.read_csv('shortable_equity_list.csv')
-  shortable_list = equity_list['symbol'].tolist()
-  for symbol in shortable_list:
-    # A special problem is the construction of tuples containing 0 or 1 
-    # items: the syntax has some extra quirks to accommodate these. 
-    # Empty tuples are constructed by an empty pair of parentheses; a 
-    # tuple with one item is constructed by following a value with a 
-    # comma (it is not sufficient to enclose a single value in 
-    # parentheses). Ugly, but effective.
-    pool.apply_async(interpolate, args=(symbol, ), callback=isempty_callback, error_callback=pool_error_callback)
-  pool.close()
-  # postpones the execution of next line of code until all processes in 
-  # the queue are done.
-  pool.join()
-  nonempty_list_df = pd.DataFrame({'symbol': nonempty_list})
-  nonempty_list_df.to_csv('nonempty_shortable_equity_list.csv')
-
-
+# Default number of epochs
+e = 25
 
 def plot_regression(x, y, m, s, symbol1, symbol2):
   plt.figure(figsize=[15, 15])  # inches
-  plt.plot(x, y, 'b.', label='observed');
+  plt.plot(x, y, 'b.', label='observed')
 
-  plt.plot(x, m, 'r', linewidth=4, label='mean');
-  plt.plot(x, m + 2 * s, 'g', linewidth=2, label=r'mean + 2 stddev');
-  plt.plot(x, m - 2 * s, 'g', linewidth=2, label=r'mean - 2 stddev');
+  plt.plot(x, m, 'r', linewidth=4, label='mean')
+  plt.plot(x, m + 2 * s, 'g', linewidth=2, label=r'mean + 2 stddev')
+  plt.plot(x, m - 2 * s, 'g', linewidth=2, label=r'mean - 2 stddev')
 
   plt.ylim(np.min(y), np.max(y));
-  plt.yticks(np.linspace(np.min(y), np.max(y), 20)[1:]);
-  plt.xticks(np.linspace(np.min(x), np.max(x), 10)[1:]);
+  plt.yticks(np.linspace(np.min(y), np.max(y), 20)[1:])
+  plt.xticks(np.linspace(np.min(x), np.max(x), 10)[1:])
 
   ax=plt.gca();
   ax.xaxis.set_ticks_position('bottom')
@@ -89,30 +62,16 @@ def plot_regression(x, y, m, s, symbol1, symbol2):
 
 def plot_loss(history, symbol1, symbol2):
   plt.plot(history.history['loss'], label='loss')
+  plt.ylim(0,5)
   plt.xlabel('Epoch')
   plt.ylabel('Error')
   plt.legend()
   plt.grid(True)
   plt.savefig('history/%s-%s_loss.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
 
-def main(argv):
-  e = 25
-  arg_help = "{0} -e <epochs> (default: epochs = 25)".format(argv[0])
-  try:
-    opts, args = getopt.getopt(argv[1:], "he:", ["help", "epochs="])
-  except:
-    print(arg_help)
-    sys.exit(2)
-
-  for opt, arg in opts:
-    if opt in ("-h", "--help"):
-      print(arg_help)
-      sys.exit(2)
-    elif opt in ("-e", "--epochs"):
-      e = int(arg)
-
-  symbol1 = 'AIRC'
-  symbol2 = 'AVB'
+def regress(row):
+  symbol1 = row['symbol1']
+  symbol2 = row['symbol2']
   bars1 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol1)
   bars2 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol2)
   assert not bars1.empty
@@ -138,17 +97,37 @@ def main(argv):
   ])
   # Do inference.
   model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=negloglik)
-  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=True);
+  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=False);
   plot_loss(history, symbol1, symbol2)
   yhat = model(bars1_np)
-  assert isinstance(yhat, tfd.Distribution)
   m = yhat.mean()
   s = yhat.stddev()
   plot_regression(bars1_np, bars2_np, m, s, symbol1, symbol2)
   mbars['mean'] = np.squeeze(m.numpy()).tolist()
   mbars['stddev'] = np.squeeze(s.numpy()).tolist()
   mbars['dev'] = abs(mbars['vwap_2'] - mbars['mean'])/mbars['stddev']
-  mbars.to_csv('%s-%s_dev.csv' % (symbol1, symbol2))
+  mbars.to_csv('dev/%s-%s_dev.csv' % (symbol1, symbol2))
+  return
+
+def main(argv):
+  global e
+  arg_help = "{0} -e <epochs> (default: epochs = 25)".format(argv[0])
+  try:
+    opts, args = getopt.getopt(argv[1:], "he:", ["help", "epochs="])
+  except:
+    print(arg_help)
+    sys.exit(2)
+
+  for opt, arg in opts:
+    if opt in ("-h", "--help"):
+      print(arg_help)
+      sys.exit(2)
+    elif opt in ("-e", "--epochs"):
+      e = int(arg)
+
+  pearson = pd.read_csv('pearson.csv')
+  pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
+  pearson.parallel_apply(regress, axis=1)
   return
 
 if __name__ == '__main__':
