@@ -85,7 +85,13 @@ def regress(row):
   ])
   # Do inference.
   model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=negloglik)
-  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=False);
+  # loss = model.evaluate(bars1_np, bars2_np, verbose=2)
+  # print("Untrained model, loss: %s" % loss)
+  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=False)
+  # model.load_weights('./checkpoints/%s-%s' % (symbol1, symbol2)).expect_partial()
+  # loss = model.evaluate(bars1_np, bars2_np, verbose=2)
+  # print("Trained model, loss: %s" % loss)
+  model.save_weights('checkpoints/%s-%s' % (symbol1, symbol2))
   plot_loss(history, symbol1, symbol2)
   yhat = model(bars1_np)
   m = yhat.mean()
