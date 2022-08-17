@@ -62,7 +62,10 @@ def plot_regression(x, y, m, s, symbol1, symbol2):
 
 def plot_loss(history, symbol1, symbol2):
   plt.plot(history.history['loss'], label='loss')
-  plt.ylim(0,5)
+  plt.ylim(-0.5,5)
+  plt.xlim(0,25)
+  plt.yticks(np.linspace(0, 5, 10)[1:])
+  plt.xticks(np.linspace(0, 25, 25)[1:])
   plt.xlabel('Epoch')
   plt.ylabel('Error')
   plt.legend()
@@ -97,7 +100,7 @@ def regress(row):
   ])
   # Do inference.
   model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=negloglik)
-  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=False);
+  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=True);
   plot_loss(history, symbol1, symbol2)
   yhat = model(bars1_np)
   m = yhat.mean()
@@ -124,10 +127,15 @@ def main(argv):
       sys.exit(2)
     elif opt in ("-e", "--epochs"):
       e = int(arg)
-
   pearson = pd.read_csv('pearson.csv')
-  pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
-  pearson.parallel_apply(regress, axis=1)
+  logger.info('Beginning regression on %s pairs.' % len(pearson))
+  # pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
+  pearson.apply(regress, axis=1)
+  # For testing a single symbol
+  # d = {'symbol1': 'AIRC', 'symbol2': 'AVB'}
+  # d = {'symbol1': 'LILA', 'symbol2': 'LILAK'}
+  # regress(d)
+  logger.info('Regression complete.')
   return
 
 if __name__ == '__main__':
