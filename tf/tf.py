@@ -27,7 +27,7 @@ headers = {
 url_v2 = 'https://paper-api.alpaca.markets/v2/'
 
 handler = logging.handlers.WatchedFileHandler(
-    os.environ.get("LOGFILE", "interpolate.log"))
+    os.environ.get("LOGFILE", "tf.log"))
 formatter = logging.Formatter("%(asctime)s:%(levelname)s:%(name)s:%(message)s")
 handler.setFormatter(formatter)
 logger = logging.getLogger(__name__)
@@ -71,9 +71,9 @@ def plot_regression(x, y, m, s, symbol1, symbol2):
   plt.figure(figsize=[15, 15])  # inches
   plt.plot(x, y, 'b.', label='observed');
 
-  plt.plot(AIRC_np, m, 'r', linewidth=4, label='mean');
-  plt.plot(AIRC_np, m + 2 * s, 'g', linewidth=2, label=r'mean + 2 stddev');
-  plt.plot(AIRC_np, m - 2 * s, 'g', linewidth=2, label=r'mean - 2 stddev');
+  plt.plot(x, m, 'r', linewidth=4, label='mean');
+  plt.plot(x, m + 2 * s, 'g', linewidth=2, label=r'mean + 2 stddev');
+  plt.plot(x, m - 2 * s, 'g', linewidth=2, label=r'mean - 2 stddev');
 
   plt.ylim(np.min(y), np.max(y));
   plt.yticks(np.linspace(np.min(y), np.max(y), 20)[1:]);
@@ -82,11 +82,8 @@ def plot_regression(x, y, m, s, symbol1, symbol2):
   ax=plt.gca();
   ax.xaxis.set_ticks_position('bottom')
   ax.yaxis.set_ticks_position('left')
-  # ax.spines['left'].set_position(('data', 180))
   ax.spines['top'].set_visible(False)
   ax.spines['right'].set_visible(False)
-  ax.spines['left'].set_smart_bounds(True)
-  ax.spines['bottom'].set_smart_bounds(True)
   plt.legend(loc='center left', fancybox=True, framealpha=0., bbox_to_anchor=(1.05, 0.5))
   plt.savefig('regression/%s-%s.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
 
