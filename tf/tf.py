@@ -119,7 +119,7 @@ def main(argv):
     elif opt in ("-e", "--epochs"):
       e = int(arg)
   pearson = pd.read_csv('pearson.csv')
-  logger.info('Beginning regression on %s pairs.' % len(pearson))
+  logger.info('Beginning regression on %s pairs over %s epochs.' % (len(pearson), e))
   pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
   pearson.parallel_apply(regress, axis=1)
   # For testing a single symbol
