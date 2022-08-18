@@ -23,7 +23,7 @@ def get_frame(row):
   frame = pd.read_csv('dev/%s_dev.csv' % (title))
   assert not frame.empty
   frame_length = len(frame)
-  if (frame_length < 20000):
+  if (frame_length < 15000):
     logger.warning('%s has only %s rows, skipping' % (title, frame_length))
     return
   frame[title] = frame['dev']
