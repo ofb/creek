@@ -5,10 +5,10 @@ import logging
 import logging.handlers
 import math
 from pandarallel import pandarallel
-import multiprocessing as mp
+import multiprocessing as mp # To get correct number of cpus
 import sys
 import getopt
-
+import numpy as np
 
 headers = {
       'APCA-API-KEY-ID':'PK52PMRHMCY15OZGMZLW',
@@ -18,6 +18,9 @@ url_v2 = 'https://paper-api.alpaca.markets/v2/'
 
 last_year_cutoff = 0.9
 historical_cutoff = 0.9
+# Experience running probabilistic linear regressions with tensorflow
+# shows that pairs with < 15 000 bars in common should be discarded
+sparse_cutoff = 15000
 
 handler = logging.handlers.WatchedFileHandler(
     os.environ.get("LOGFILE", "pearson_historical.log"))
@@ -75,6 +78,8 @@ def pearson(row):
   merged = frames[symbol1].merge(frames[symbol2], 'inner', 
 								on='timestamp', suffixes=('1', '2'))
   n = len(merged)
+  if (n < sparse_cutoff):
+    return np.nan
   merged['xy'] = merged['vwap1'] * merged['vwap2']
   merged['xsquared'] = merged['vwap1'] * merged['vwap1']
   merged['ysquared'] = merged['vwap2'] * merged['vwap2']
@@ -107,7 +112,7 @@ def pearson_historical():
   active_symbols = []
   active_symbols.extend(p['symbol1'].tolist())
   active_symbols.extend(p['symbol2'].tolist())
-  active_symbols = set(active_symbols)
+  active_symbols = set(active_symbols) # remove duplicates
   logger.info('Opening %s databases' % len(active_symbols))
   for symbol in active_symbols:
     get_frame(symbol)
@@ -121,6 +126,7 @@ def pearson_historical():
   logger.info('Beginning Pearson correlation computation')
   pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
   p['pearson_historical'] = p.parallel_apply(pearson, axis=1)
+  p = p[~p['pearson_historical'].isna()]
   p = p[['symbol1', 'symbol2', 'pearson', 'pearson_historical', 'symbol1_name', 'symbol2_name']]
   logger.info('Computation complete')
   return 1
@@ -136,9 +142,10 @@ def main(argv):
   arg_refresh = True
   arg_last_year_cutoff = 0.9
   arg_historical_cutoff = 0.9
-  arg_help = "{0} -r <refresh> -c <last_year_cutoff> -t <historical_cutoff> (defaults: refresh = 1, last_year_cutoff = 0.9, historical_cutoff = 0.9)".format(argv[0])
+  arg_sparse_cutoff = 15000
+  arg_help = "{0} -r <refresh> -c <last_year_cutoff> -t <historical_cutoff> -s <sparse_cutoff> (defaults: refresh = 1, last_year_cutoff = 0.9, historical_cutoff = 0.9, sparse_cutoff = 1500)".format(argv[0])
   try:
-    opts, args = getopt.getopt(argv[1:], "hr:c:t:", ["help", "refresh=", "cutoff=", "historical_cutoff="])
+    opts, args = getopt.getopt(argv[1:], "hr:c:t:s:", ["help", "refresh=", "cutoff=", "historical_cutoff=", "sparse_cutoff="])
   except:
     print(arg_help)
     sys.exit(2)
@@ -153,10 +160,14 @@ def main(argv):
       arg_last_year_cutoff = float(arg)
     elif opt in ("-t", "--historical_cutoff"):
       arg_historical_cutoff = float(arg)
+    elif opt in ("-s", "--sparse_cutoff"):
+      arg_sparse_cutoff = int(arg)
   global last_year_cutoff
   global historical_cutoff
+  global sparse_cutoff
   last_year_cutoff = arg_last_year_cutoff
   historical_cutoff = arg_historical_cutoff
+  sparse_cutoff = arg_sparse_cutoff
   global p
   if arg_refresh:
     initial_truncate('pearson')
