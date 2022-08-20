@@ -35,6 +35,8 @@ p = pd.DataFrame()
 # Frames will be populated with the dataframes for each symbol
 frames = {}
 missing_bars = []
+hour_directory = 'us_equities_hourly'
+minute_directory = 'us_equities_2022'
 
 def initial_truncate(filename):
   resp = requests.get(url_v2 + 'assets', headers=headers)
@@ -78,8 +80,6 @@ def pearson(row):
   merged = frames[symbol1].merge(frames[symbol2], 'inner', 
 								on='timestamp', suffixes=('1', '2'))
   n = len(merged)
-  if (n < sparse_cutoff):
-    return np.nan
   merged['xy'] = merged['vwap1'] * merged['vwap2']
   merged['xsquared'] = merged['vwap1'] * merged['vwap1']
   merged['ysquared'] = merged['vwap2'] * merged['vwap2']
@@ -91,12 +91,16 @@ def pearson(row):
   return ((n * xy - x * y) / 
 			math.sqrt((n * xsquared - x * x) * (n * ysquared - y * y)))
 			
-def get_frame(symbol):
+def get_frame(symbol, interval):
   global frames
   global missing_bars
   frame = pd.DataFrame()
+  if (interval == 'Hour'):
+    directory = hour_directory
+  elif (interval == 'Minute'):
+    directory = minute_directory
   try:
-    frame = pd.read_csv('/mnt/disks/creek-1/us_equities_hourly/%s.csv' % symbol)
+    frame = pd.read_csv('/mnt/disks/creek-1/%s/%s.csv' % (directory, symbol))
     frame = frame.drop(columns=['symbol','open','high','low','close','volume','trade_count'],axis=1)
     frame.set_index('timestamp', inplace=True)
     frame.index = pd.to_datetime(frame.index)
@@ -106,30 +110,48 @@ def get_frame(symbol):
     missing_bars.append(symbol)
   return
 
-def pearson_historical():
-  global p
-  global frames
+def get_active_symbols():
   active_symbols = []
   active_symbols.extend(p['symbol1'].tolist())
   active_symbols.extend(p['symbol2'].tolist())
-  active_symbols = set(active_symbols) # remove duplicates
-  logger.info('Opening %s databases' % len(active_symbols))
-  for symbol in active_symbols:
-    get_frame(symbol)
-  logger.info('Completed loading databases')
+  return set(active_symbols) # remove duplicates
+
+def check_missing_bars():
   if len(missing_bars) > 0:
     print('There were missing bars. Exiting.')
     missing_bars_df = pd.DataFrame({'symbol': missing_bars})
     missing_bars_df.to_csv('missing_bars.csv')
     logger.error('There were missing bars.')
     return 0
+  else: return 1
+
+def pearson_historical():
+  global p
+  global frames
+  active_symbols = get_active_symbols()
+  logger.info('Opening %s hour databases' % len(active_symbols))
+  for symbol in active_symbols:
+    get_frame(symbol, 'Hour')
+  logger.info('Completed loading hour databases')
+  if check_missing_bars(): return 0
   logger.info('Beginning Pearson correlation computation')
-  pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
   p['pearson_historical'] = p.parallel_apply(pearson, axis=1)
-  p = p[~p['pearson_historical'].isna()]
   p = p[['symbol1', 'symbol2', 'pearson', 'pearson_historical', 'symbol1_name', 'symbol2_name']]
   logger.info('Computation complete')
   return 1
+
+def is_sparse(row):
+  symbol1 = row['symbol1']
+  symbol2 = row['symbol2']
+  merged = frames[symbol1].merge(frames[symbol2], 'inner', 
+								on='timestamp', suffixes=('1', '2'))
+  n = len(merged)
+  if (n < sparse_cutoff):
+    logger.warning('Discarding %s-%s has %s < %s bars in common' % (symbol1,symbol2,n,sparse_cutoff))
+    return True
+  else: 
+    logger.info('%s-%s has %s > %s bars in common' % (symbol1,symbol2,n,sparse_cutoff))
+    return False
 
 def historical_sort():
   global p
@@ -138,12 +160,30 @@ def historical_sort():
   p.sort_values(by=['abs'], ascending=False, inplace=True)
   p.drop(['abs'], axis=1, inplace=True)
 
+def sparse_truncate():
+  global frames
+  global missing_bars
+  frames = {}
+  missing_bars = []
+  active_symbols = get_active_symbols()
+  logger.info('Opening %s minute databases' % len(active_symbols))
+  for symbol in active_symbols:
+    get_frame(symbol, 'Minute')
+  logger.info('Completed loading minute databases')
+  if check_missing_bars(): return 0
+  logger.info('Beginning sparse truncation on minute bars with cutoff %s', sparse_cutoff)
+  p['sparse'] = p.parallel_apply(is_sparse, axis=1)
+  p = p[~p['sparse']]
+  p = p.drop(columns=['sparse'],axis=1)
+  logger.info('Sparse drop complete')
+  return 1
+
 def main(argv):
   arg_refresh = True
   arg_last_year_cutoff = 0.9
   arg_historical_cutoff = 0.9
   arg_sparse_cutoff = 15000
-  arg_help = "{0} -r <refresh> -c <last_year_cutoff> -t <historical_cutoff> -s <sparse_cutoff> (defaults: refresh = 1, last_year_cutoff = 0.9, historical_cutoff = 0.9, sparse_cutoff = 1500)".format(argv[0])
+  arg_help = "{0} -r <refresh> -c <last_year_cutoff> -t <historical_cutoff> -s <sparse_cutoff> (defaults: refresh = 1, last_year_cutoff = 0.9, historical_cutoff = 0.9, sparse_cutoff = 15000 (enter 0 to skip sparse truncation))".format(argv[0])
   try:
     opts, args = getopt.getopt(argv[1:], "hr:c:t:s:", ["help", "refresh=", "cutoff=", "historical_cutoff=", "sparse_cutoff="])
   except:
@@ -170,16 +210,19 @@ def main(argv):
   sparse_cutoff = arg_sparse_cutoff
   global p
   if arg_refresh:
+    pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
     initial_truncate('pearson')
     r = pearson_historical()
     if not r: return
-    historical_sort()
   else:
     initial_truncate('pearson_historical')
     # When importing from csv, the first column is imported as
     # 'Unnamed: 0'
     p.drop(['Unnamed: 0'], axis=1, inplace=True)
-    historical_sort()
+  if sparse_cutoff != 0:
+    pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
+    if not sparse_truncate(): return
+  historical_sort()
   p.to_csv('pearson_historical_truncated.csv')
 
 if __name__ == '__main__':
