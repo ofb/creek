@@ -170,7 +170,7 @@ def sparse_truncate():
   for symbol in active_symbols:
     get_frame(symbol, 'Minute')
   logger.info('Completed loading minute databases')
-  if check_missing_bars(): return 0
+  if not check_missing_bars(): return 0
   logger.info('Beginning sparse truncation on minute bars with cutoff %s', sparse_cutoff)
   p['sparse'] = p.parallel_apply(is_sparse, axis=1)
   p = p[~p['sparse']]
@@ -202,15 +202,17 @@ def main(argv):
       arg_historical_cutoff = float(arg)
     elif opt in ("-s", "--sparse_cutoff"):
       arg_sparse_cutoff = int(arg)
+  assert arg_sparse_cutoff >= 0
   global last_year_cutoff
   global historical_cutoff
   global sparse_cutoff
+  global p
   last_year_cutoff = arg_last_year_cutoff
   historical_cutoff = arg_historical_cutoff
   sparse_cutoff = arg_sparse_cutoff
-  global p
-  if arg_refresh:
+  if arg_refresh or (sparse_cutoff != 0):
     pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
+  if arg_refresh:
     initial_truncate('pearson')
     r = pearson_historical()
     if not r: return
@@ -220,7 +222,6 @@ def main(argv):
     # 'Unnamed: 0'
     p.drop(['Unnamed: 0'], axis=1, inplace=True)
   if sparse_cutoff != 0:
-    pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
     if not sparse_truncate(): return
   historical_sort()
   p.to_csv('pearson_historical_truncated.csv')
