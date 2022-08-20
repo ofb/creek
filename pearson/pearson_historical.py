@@ -161,6 +161,7 @@ def historical_sort():
   p.drop(['abs'], axis=1, inplace=True)
 
 def sparse_truncate():
+  global p
   global frames
   global missing_bars
   frames = {}
