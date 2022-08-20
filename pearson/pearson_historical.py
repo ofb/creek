@@ -146,12 +146,8 @@ def is_sparse(row):
   merged = frames[symbol1].merge(frames[symbol2], 'inner', 
 								on='timestamp', suffixes=('1', '2'))
   n = len(merged)
-  if (n < sparse_cutoff):
-    logger.warning('Discarding %s-%s has %s < %s bars in common' % (symbol1,symbol2,n,sparse_cutoff))
-    return True
-  else: 
-    logger.info('%s-%s has %s > %s bars in common' % (symbol1,symbol2,n,sparse_cutoff))
-    return False
+  if (n < sparse_cutoff): return True
+  else: return False
 
 def historical_sort():
   global p
