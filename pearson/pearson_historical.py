@@ -91,6 +91,14 @@ def pearson(row):
   return ((n * xy - x * y) / 
 			math.sqrt((n * xsquared - x * x) * (n * ysquared - y * y)))
 			
+def compare_mean(row):
+  symbol1 = row['symbol1']
+  symbol2 = row['symbol2']
+  mean1 = frames[symbol1]['vwap'].mean()
+  mean2 = frames[symbol2]['vwap'].mean()
+  if mean1 > mean2: return 1
+  else: return 0
+
 def get_frame(symbol, interval):
   global frames
   global missing_bars
@@ -143,8 +151,7 @@ def pearson_historical():
 def is_sparse(row):
   symbol1 = row['symbol1']
   symbol2 = row['symbol2']
-  merged = frames[symbol1].merge(frames[symbol2], 'inner', 
-								on='timestamp', suffixes=('1', '2'))
+  merged = frames[symbol1].merge(frames[symbol2], 'inner', on='timestamp', suffixes=('1', '2'))
   n = len(merged)
   if (n < sparse_cutoff): return True
   else: return False
@@ -173,6 +180,12 @@ def sparse_truncate():
   p = p[~p['sparse']]
   p = p.drop(columns=['sparse'],axis=1)
   logger.info('Sparse drop complete')
+  # Reorder symbols so the one with the larger average price is second
+  logger.info('Swapping symbols')
+  p['swap'] = p.parallel_apply(compare_mean, axis=1)
+  p[['symbol1','symbol2','symbol1_name','symbol2_name']] = p[['symbol2','symbol1','symbol2_name','symbol1_name']].where(p['swap'] == 1, p[['symbol1','symbol2','symbol1_name','symbol2_name']].values)
+  p = p.drop(columns=['swap'],axis=1)
+  logger.info('Swap complete')
   return 1
 
 def main(argv):

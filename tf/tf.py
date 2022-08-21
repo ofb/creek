@@ -23,7 +23,7 @@ logger.setLevel(os.environ.get("LOGLEVEL", "INFO"))
 logger.addHandler(handler)
 
 # Default number of epochs
-e = 150
+e = 100
 
 def plot_regression(x, y, m, s, symbol1, symbol2):
   plt.clf()
@@ -115,7 +115,7 @@ def regress(row):
 
 def main(argv):
   global e
-  arg_help = "{0} -e <epochs> (default: epochs = 150)".format(argv[0])
+  arg_help = "{0} -e <epochs> (default: epochs = 100)".format(argv[0])
   try:
     opts, args = getopt.getopt(argv[1:], "he:", ["help", "epochs="])
   except:
