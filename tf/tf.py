@@ -24,6 +24,33 @@ logger.addHandler(handler)
 
 # Default number of epochs
 e = 100
+refresh = 1
+frames = {}
+directory = 'us_equities_2022'
+
+def get_active_symbols(p):
+  active_symbols = []
+  active_symbols.extend(p['symbol1'].tolist())
+  active_symbols.extend(p['symbol2'].tolist())
+  return set(active_symbols) # remove duplicates
+
+def get_frames(symbols):
+  logger.info('Fetching minute bars for %s symbols' % len(symbols))
+  global frames
+  frame = pd.DataFrame()
+  for symbol in symbols:
+    try:
+      frame = pd.read_csv('/mnt/disks/creek-1/%s/%s.csv' % (directory,symbol))
+      assert not frame.empty
+      frame = frame.drop(columns=['symbol','open','high','low','close','volume','trade_count'],axis=1)
+      frame.set_index('timestamp', inplace=True)
+      frame.index = pd.to_datetime(frame.index)
+      frames[symbol] = frame
+    except FileNotFoundError as error:
+      logger.warning('%s.csv not found' % symbol)
+      sys.exit(1)
+  logger.info('Databases loaded')
+  return
 
 def plot_regression(x, y, m, s, symbol1, symbol2):
   plt.clf()
@@ -63,16 +90,12 @@ def regress(row):
   symbol1 = row['symbol1']
   symbol2 = row['symbol2']
   title = symbol1 + '-' + symbol2
-  bars1 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol1)
-  bars2 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol2)
-  assert not bars1.empty
-  assert not bars2.empty
-  bars1 = bars1.drop(columns=['symbol','open','high','low','close','volume','trade_count'],axis=1)
-  bars1.set_index('timestamp', inplace=True)
-  bars1.index = pd.to_datetime(bars1.index)
-  bars2 = bars2.drop(columns=['symbol','open','high','low','close','volume','trade_count'],axis=1)
-  bars2.set_index('timestamp', inplace=True)
-  bars2.index = pd.to_datetime(bars2.index)
+  if not refresh:
+    if os.path.isfile('checkpoints/%s.index' % title):
+      logger.info('%s has already been computed, skipping' % title)
+      return
+  bars1 = frames[symbol1]
+  bars2 = frames[symbol2]
   mbars = bars1.merge(bars2, how='inner', on='timestamp', suffixes=['_1','_2'])
   merged_length = len(mbars)
   # logger.info('%s has %s bars in common', (title, merged_length))
@@ -115,9 +138,10 @@ def regress(row):
 
 def main(argv):
   global e
-  arg_help = "{0} -e <epochs> (default: epochs = 100)".format(argv[0])
+  global refresh
+  arg_help = "{0} -r <refresh> -e <epochs> (default: refresh = 1, epochs = 100)".format(argv[0])
   try:
-    opts, args = getopt.getopt(argv[1:], "he:", ["help", "epochs="])
+    opts, args = getopt.getopt(argv[1:], "hr:e:", ["help", "refresh=", "epochs="])
   except:
     print(arg_help)
     sys.exit(2)
@@ -126,19 +150,23 @@ def main(argv):
     if opt in ("-h", "--help"):
       print(arg_help)
       sys.exit(2)
+    elif opt in ("-r", "--refresh"):
+      refresh = bool(eval(arg))
     elif opt in ("-e", "--epochs"):
       e = int(arg)
   pearson = pd.read_csv('pearson.csv')
+  symbols = get_active_symbols(pearson)
+  get_frames(symbols)
   logger.info('Beginning regression on %s pairs over %s epochs.' % (len(pearson), e))
   pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
   pearson.parallel_apply(regress, axis=1)
   # For testing a single symbol
   # d = {'symbol1': 'AIRC', 'symbol2': 'AVB'}
-  # d = {'symbol1': 'LILA', 'symbol2': 'LILAK'}
-  # d = {'symbol1': 'FVRR', 'symbol2': 'BLZE'}
   # d = {'symbol1': 'PHM', 'symbol2': 'NVR'}
+  # d = {'symbol1': 'ZBRA', 'symbol2': 'MTD'}
+  # get_frames(set([d['symbol1'], d['symbol2']]))
   # regress(d)
-  # logger.info('Regression complete.')
+  logger.info('Regression complete.')
   return
 
 if __name__ == '__main__':
