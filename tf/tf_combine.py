@@ -13,6 +13,7 @@ logger.addHandler(handler)
 
 p = pd.DataFrame()
 indices = []
+dev_directory = '/mnt/disks/creek-1/tf/dev'
 
 def get_frame(row):
   global p
@@ -20,12 +21,9 @@ def get_frame(row):
   symbol1 = row['symbol1']
   symbol2 = row['symbol2']
   title = symbol1 + '-' + symbol2
-  frame = pd.read_csv('dev/%s_dev.csv' % (title))
+  frame = pd.read_csv('%s/%s_dev.csv' % (dev_directory,title))
   assert not frame.empty
   frame_length = len(frame)
-  if (frame_length < 15000):
-    logger.warning('%s has only %s rows, skipping' % (title, frame_length))
-    return
   frame[title] = frame['dev']
   frame = frame.drop(columns=['vwap_1','vwap_2','mean','stddev','dev'],axis=1)
   frame.set_index('timestamp', inplace=True)
@@ -49,7 +47,9 @@ def main():
   pearson.apply(get_frame, axis=1)
   logger.info('Summarizing')
   p['summary'] = p.apply(lambda row: summarize(row), axis=1)
-  p.to_csv('list_dev.csv')
+  # The below file is quite large and the information it contains is
+  # not so critical so we omit it.
+  # p.to_csv('list_dev.csv')
   p = p['summary']
   p.to_csv('summary_dev.csv')
   logger.info('Done')

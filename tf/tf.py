@@ -27,6 +27,7 @@ e = 100
 refresh = 1
 frames = {}
 directory = 'us_equities_2022'
+dev_directory = '/mnt/disks/creek-1/tf/dev'
 
 def get_active_symbols(p):
   active_symbols = []
@@ -139,12 +140,25 @@ def regress(row):
   mbars.to_csv('dev/%s_dev.csv' % title)
   return
 
+def is_missing(row):
+  symbol1 = row['symbol1']
+  symbol2 = row['symbol2']
+  title = symbol1 + '-' + symbol2
+  return os.path.isfile('%s/%s_dev.csv' % (dev_directory,title))
+
+def find_missing(p):
+  p['is_missing'] = p.apply(is_missing,axis=1)
+  p = p[~p['is_missing']]
+  p = p.drop(columns=['Unnamed: 0','is_missing'])
+  return p
+
 def main(argv):
   global e
   global refresh
-  arg_help = "{0} -r <refresh> -e <epochs> (default: refresh = 1, epochs = 100)".format(argv[0])
+  missing = 0
+  arg_help = "{0} -r <refresh> -e <epochs> -m (default: refresh = 1, epochs = 100, missing = 0)".format(argv[0])
   try:
-    opts, args = getopt.getopt(argv[1:], "hr:e:", ["help", "refresh=", "epochs="])
+    opts, args = getopt.getopt(argv[1:], "hr:e:m:", ["help", "refresh=", "epochs=", "missing="])
   except:
     print(arg_help)
     sys.exit(2)
@@ -157,7 +171,14 @@ def main(argv):
       refresh = bool(eval(arg))
     elif opt in ("-e", "--epochs"):
       e = int(arg)
+    elif opt in ("-m", "--missing"):
+      missing = bool(eval(arg))
   pearson = pd.read_csv('pearson.csv')
+  if missing:
+    p = pd.DataFrame()
+    p = find_missing(pearson)
+    p.to_csv('missing_pairs.csv')
+    return
   symbols = get_active_symbols(pearson)
   get_frames(symbols)
   logger.info('Beginning regression on %s pairs over %s epochs.' % (len(pearson), e))
