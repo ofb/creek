@@ -72,6 +72,8 @@ def plot_regression(x, y, m, s, symbol1, symbol2):
   ax.spines['right'].set_visible(False)
   plt.legend(loc='center left', fancybox=True, framealpha=0., bbox_to_anchor=(1.05, 0.5))
   plt.savefig('regression/%s-%s.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
+  plt.close()
+  return
 
 def plot_loss(history, symbol1, symbol2, e):
   plt.clf()
@@ -85,6 +87,7 @@ def plot_loss(history, symbol1, symbol2, e):
   plt.legend()
   plt.grid(True)
   plt.savefig('loss/%s-%s_loss.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
+  return
 
 def regress(row):
   symbol1 = row['symbol1']
