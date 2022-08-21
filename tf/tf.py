@@ -23,9 +23,10 @@ logger.setLevel(os.environ.get("LOGLEVEL", "INFO"))
 logger.addHandler(handler)
 
 # Default number of epochs
-e = 25
+e = 150
 
 def plot_regression(x, y, m, s, symbol1, symbol2):
+  plt.clf()
   plt.figure(figsize=[15, 15])  # inches
   plt.plot(x, y, 'b.', label='observed')
 
@@ -46,6 +47,7 @@ def plot_regression(x, y, m, s, symbol1, symbol2):
   plt.savefig('regression/%s-%s.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
 
 def plot_loss(history, symbol1, symbol2, e):
+  plt.clf()
   plt.plot(history.history['loss'], label='loss')
   plt.ylim(-2,15)
   plt.xlim(0,e)
@@ -60,6 +62,7 @@ def plot_loss(history, symbol1, symbol2, e):
 def regress(row):
   symbol1 = row['symbol1']
   symbol2 = row['symbol2']
+  title = symbol1 + '-' + symbol2
   bars1 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol1)
   bars2 = pd.read_csv('/mnt/disks/creek-1/us_equities_2022/%s.csv' % symbol2)
   assert not bars1.empty
@@ -71,11 +74,14 @@ def regress(row):
   bars2.set_index('timestamp', inplace=True)
   bars2.index = pd.to_datetime(bars2.index)
   mbars = bars1.merge(bars2, how='inner', on='timestamp', suffixes=['_1','_2'])
+  merged_length = len(mbars)
+  logger.info('%s has %s bars in common' % (title, merged_length))
   bars1_np = np.array(mbars['vwap_1'], dtype='float32')
   bars1_np = np.expand_dims(bars1_np, axis=1)
   bars2_np = np.array(mbars['vwap_2'], dtype='float32')
   bars2_np = np.expand_dims(bars2_np, axis=1)
   negloglik = lambda y, rv_y: -rv_y.log_prob(y)
+  callback = tf.keras.callbacks.EarlyStopping(monitor='loss', min_delta=0.001, patience=10, verbose=0, mode='min', restore_best_weights=1)
   # Build probabilistic model.
   model = tf.keras.Sequential([
     tf.keras.layers.Dense(1 + 1),
@@ -87,11 +93,13 @@ def regress(row):
   model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=negloglik)
   # loss = model.evaluate(bars1_np, bars2_np, verbose=2)
   # print("Untrained model, loss: %s" % loss)
-  history = model.fit(bars1_np, bars2_np, epochs=e, verbose=False)
+  history = model.fit(bars1_np, bars2_np, epochs=e, callbacks=[callback], verbose=False)
   # model.load_weights('./checkpoints/%s-%s' % (symbol1, symbol2)).expect_partial()
   # loss = model.evaluate(bars1_np, bars2_np, verbose=2)
   # print("Trained model, loss: %s" % loss)
-  model.save_weights('checkpoints/%s-%s' % (symbol1, symbol2))
+  model.save_weights('checkpoints/%s' % title)
+  if len(history.history['loss'] == e):
+    logger.warn('%s did not converge in %s epochs' % (title, e))
   plot_loss(history, symbol1, symbol2, e)
   yhat = model(bars1_np)
   m = yhat.mean()
@@ -100,12 +108,12 @@ def regress(row):
   mbars['mean'] = np.squeeze(m.numpy()).tolist()
   mbars['stddev'] = np.squeeze(s.numpy()).tolist()
   mbars['dev'] = abs(mbars['vwap_2'] - mbars['mean'])/mbars['stddev']
-  mbars.to_csv('dev/%s-%s_dev.csv' % (symbol1, symbol2))
+  mbars.to_csv('dev/%s_dev.csv' % title)
   return
 
 def main(argv):
   global e
-  arg_help = "{0} -e <epochs> (default: epochs = 25)".format(argv[0])
+  arg_help = "{0} -e <epochs> (default: epochs = 150)".format(argv[0])
   try:
     opts, args = getopt.getopt(argv[1:], "he:", ["help", "epochs="])
   except:
@@ -126,6 +134,7 @@ def main(argv):
   # d = {'symbol1': 'AIRC', 'symbol2': 'AVB'}
   # d = {'symbol1': 'LILA', 'symbol2': 'LILAK'}
   # d = {'symbol1': 'FVRR', 'symbol2': 'BLZE'}
+  # d = {'symbol1': 'NVR', 'symbol2': 'PHM'}
   # regress(d)
   logger.info('Regression complete.')
   return

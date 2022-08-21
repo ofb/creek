@@ -176,10 +176,11 @@ def sparse_truncate():
   return 1
 
 def main(argv):
+  global last_year_cutoff
+  global historical_cutoff
+  global sparse_cutoff
+  global p
   arg_refresh = True
-  arg_last_year_cutoff = 0.9
-  arg_historical_cutoff = 0.9
-  arg_sparse_cutoff = 15000
   arg_help = "{0} -r <refresh> -c <last_year_cutoff> -t <historical_cutoff> -s <sparse_cutoff> (defaults: refresh = 1, last_year_cutoff = 0.9, historical_cutoff = 0.9, sparse_cutoff = 15000 (enter 0 to skip sparse truncation))".format(argv[0])
   try:
     opts, args = getopt.getopt(argv[1:], "hr:c:t:s:", ["help", "refresh=", "cutoff=", "historical_cutoff=", "sparse_cutoff="])
@@ -194,19 +195,12 @@ def main(argv):
     elif opt in ("-r", "--refresh"):
       arg_refresh = bool(eval(arg))
     elif opt in ("-c", "--cutoff"):
-      arg_last_year_cutoff = float(arg)
+      last_year_cutoff = float(arg)
     elif opt in ("-t", "--historical_cutoff"):
-      arg_historical_cutoff = float(arg)
+      historical_cutoff = float(arg)
     elif opt in ("-s", "--sparse_cutoff"):
-      arg_sparse_cutoff = int(arg)
-  assert arg_sparse_cutoff >= 0
-  global last_year_cutoff
-  global historical_cutoff
-  global sparse_cutoff
-  global p
-  last_year_cutoff = arg_last_year_cutoff
-  historical_cutoff = arg_historical_cutoff
-  sparse_cutoff = arg_sparse_cutoff
+      sparse_cutoff = int(arg)
+  assert sparse_cutoff >= 0
   if arg_refresh or (sparse_cutoff != 0):
     pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
   if arg_refresh:
