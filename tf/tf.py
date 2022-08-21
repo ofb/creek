@@ -75,7 +75,6 @@ def regress(row):
   bars2.index = pd.to_datetime(bars2.index)
   mbars = bars1.merge(bars2, how='inner', on='timestamp', suffixes=['_1','_2'])
   merged_length = len(mbars)
-  logger.info('%s has %s bars in common' % (title, merged_length))
   bars1_np = np.array(mbars['vwap_1'], dtype='float32')
   bars1_np = np.expand_dims(bars1_np, axis=1)
   bars2_np = np.array(mbars['vwap_2'], dtype='float32')
@@ -99,7 +98,7 @@ def regress(row):
   # print("Trained model, loss: %s" % loss)
   model.save_weights('checkpoints/%s' % title)
   if len(history.history['loss']) == e:
-    logger.warn('%s did not converge in %s epochs' % (title, e))
+    logger.warning('%s did not converge in %s epochs' % (title, e))
   plot_loss(history, symbol1, symbol2, e)
   yhat = model(bars1_np)
   m = yhat.mean()
