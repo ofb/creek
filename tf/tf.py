@@ -98,7 +98,7 @@ def regress(row):
   # loss = model.evaluate(bars1_np, bars2_np, verbose=2)
   # print("Trained model, loss: %s" % loss)
   model.save_weights('checkpoints/%s' % title)
-  if len(history.history['loss'] == e):
+  if len(history.history['loss']) == e:
     logger.warn('%s did not converge in %s epochs' % (title, e))
   plot_loss(history, symbol1, symbol2, e)
   yhat = model(bars1_np)
