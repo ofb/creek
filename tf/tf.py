@@ -57,7 +57,7 @@ def plot_loss(history, symbol1, symbol2, e):
   plt.ylabel('Error')
   plt.legend()
   plt.grid(True)
-  plt.savefig('history/%s-%s_loss.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
+  plt.savefig('loss/%s-%s_loss.png' % (symbol1, symbol2), bbox_inches='tight', dpi=300)
 
 def regress(row):
   symbol1 = row['symbol1']
@@ -75,6 +75,7 @@ def regress(row):
   bars2.index = pd.to_datetime(bars2.index)
   mbars = bars1.merge(bars2, how='inner', on='timestamp', suffixes=['_1','_2'])
   merged_length = len(mbars)
+  # logger.info('%s has %s bars in common', (title, merged_length))
   bars1_np = np.array(mbars['vwap_1'], dtype='float32')
   bars1_np = np.expand_dims(bars1_np, axis=1)
   bars2_np = np.array(mbars['vwap_2'], dtype='float32')
@@ -92,14 +93,16 @@ def regress(row):
   model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.01), loss=negloglik)
   # loss = model.evaluate(bars1_np, bars2_np, verbose=2)
   # print("Untrained model, loss: %s" % loss)
+  # delete this - no callback
   history = model.fit(bars1_np, bars2_np, epochs=e, callbacks=[callback], verbose=False)
   # model.load_weights('./checkpoints/%s-%s' % (symbol1, symbol2)).expect_partial()
   # loss = model.evaluate(bars1_np, bars2_np, verbose=2)
   # print("Trained model, loss: %s" % loss)
   model.save_weights('checkpoints/%s' % title)
-  if len(history.history['loss']) == e:
+  computed_epochs = len(history.history['loss'])
+  if computed_epochs == e:
     logger.warning('%s did not converge in %s epochs' % (title, e))
-  plot_loss(history, symbol1, symbol2, e)
+  plot_loss(history, symbol1, symbol2, computed_epochs)
   yhat = model(bars1_np)
   m = yhat.mean()
   s = yhat.stddev()
@@ -133,9 +136,9 @@ def main(argv):
   # d = {'symbol1': 'AIRC', 'symbol2': 'AVB'}
   # d = {'symbol1': 'LILA', 'symbol2': 'LILAK'}
   # d = {'symbol1': 'FVRR', 'symbol2': 'BLZE'}
-  # d = {'symbol1': 'NVR', 'symbol2': 'PHM'}
+  # d = {'symbol1': 'PHM', 'symbol2': 'NVR'}
   # regress(d)
-  logger.info('Regression complete.')
+  # logger.info('Regression complete.')
   return
 
 if __name__ == '__main__':
