@@ -187,7 +187,7 @@ def main(argv):
   # For testing a single symbol
   # d = {'symbol1': 'AIRC', 'symbol2': 'AVB'}
   # d = {'symbol1': 'PHM', 'symbol2': 'NVR'}
-  # d = {'symbol1': 'ZBRA', 'symbol2': 'MTD'}
+  # d = {'symbol1': 'WBD', 'symbol2': 'SLF'}
   # get_frames(set([d['symbol1'], d['symbol2']]))
   # regress(d)
   logger.info('Regression complete.')
