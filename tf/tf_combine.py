@@ -51,7 +51,11 @@ def main():
   # not so critical so we omit it.
   # p.to_csv('list_dev.csv')
   p = p['summary']
-  p.to_csv('summary_dev.csv')
+  # Now the point is that we want to bin by hour ('H') or by day ('D')
+  p = p.resample('H').sum()
+  p.to_csv('summary_dev_hour.csv')
+  p = p.resample('D').sum()
+  p.to_csv('summary_dev_day.csv')
   logger.info('Done')
   return
 
