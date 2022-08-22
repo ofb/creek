@@ -2,6 +2,8 @@ import logging
 import logging.handlers
 import os
 import pandas as pd
+import sys
+import getopt
 
 handler = logging.handlers.WatchedFileHandler(
     os.environ.get("LOGFILE", "tf.log"))
@@ -14,6 +16,7 @@ logger.addHandler(handler)
 p = pd.DataFrame()
 indices = []
 dev_directory = '/mnt/disks/creek-1/tf/dev'
+sigma = 2
 
 def get_frame(row):
   global p
@@ -38,10 +41,24 @@ def get_frame(row):
 def summarize(row):
   counter = 0
   for i in indices:
-    if row[i] >= 2: counter += 1
+    if row[i] >= sigma: counter += 1
   return counter
 
-def main():
+def main(argv):
+  global sigma
+  arg_help = "{0} -s <sigma> (default: sigma = 2)".format(argv[0])
+  try:
+    opts, args = getopt.getopt(argv[1:], "hs:", ["help", "sigma="])
+  except:
+    print(arg_help)
+    sys.exit(2)
+
+  for opt, arg in opts:
+    if opt in ("-h", "--help"):
+      print(arg_help)
+      sys.exit(2)
+    elif opt in ("-s", "--sigma"):
+      sigma = arg
   global p
   pearson = pd.read_csv('pearson.csv')
   pearson.apply(get_frame, axis=1)
@@ -53,11 +70,11 @@ def main():
   p = p['summary']
   # Now the point is that we want to bin by hour ('H') or by day ('D')
   p = p.resample('H').sum()
-  p.to_csv('summary_dev_hour.csv')
+  p.to_csv('summary_dev_hour_%s_sigma.csv' % sigma)
   p = p.resample('D').sum()
-  p.to_csv('summary_dev_day.csv')
+  p.to_csv('summary_dev_day_%s_sigma.csv' % sigma)
   logger.info('Done')
   return
 
 if __name__ == '__main__':
-  main()
+  main(sys.argv)
