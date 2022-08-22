@@ -26,7 +26,6 @@ def get_frame(row):
   title = symbol1 + '-' + symbol2
   frame = pd.read_csv('%s/%s_dev.csv' % (dev_directory,title))
   assert not frame.empty
-  frame_length = len(frame)
   frame[title] = frame['dev']
   frame = frame.drop(columns=['vwap_1','vwap_2','mean','stddev','dev'],axis=1)
   frame.set_index('timestamp', inplace=True)
@@ -38,6 +37,29 @@ def get_frame(row):
     indices.append(title)
   return
 
+def get_summarized_frame(row):
+  global p
+  global indices
+  symbol1 = row['symbol1']
+  symbol2 = row['symbol2']
+  title = symbol1 + '-' + symbol2
+  frame = pd.read_csv('%s/%s_dev.csv' % (dev_directory,title))
+  assert not frame.empty
+  frame = frame.drop(columns=['vwap_1','vwap_2','mean','stddev'],axis=1)
+  frame.set_index('timestamp', inplace=True)
+  frame.index = pd.to_datetime(frame.index)
+  column_title = '>%.1f_sigma' % sigma
+  if p.empty:
+    p = frame 
+    p[column_title] = p.apply(lambda row: 1 if row['dev'] >= sigma else 0, axis=1)
+    p = p.drop(columns=['dev'], axis=1)
+  else:
+    p = p.merge(frame, how='outer', on='timestamp', suffixes=(None,None))
+    p['temp'] = p.apply(lambda row: 1 if row['dev'] >= sigma else 0, axis=1)
+    p[column_title] = p[column_title] + p['temp']
+    p = p.drop(columns=['dev', 'temp'], axis=1)
+  return
+
 def summarize(row):
   counter = 0
   for i in indices:
@@ -46,9 +68,10 @@ def summarize(row):
 
 def main(argv):
   global sigma
-  arg_help = "{0} -s <sigma> (default: sigma = 2)".format(argv[0])
+  terse = 1
+  arg_help = "{0} -s <sigma> -t (default: sigma = 2, terse = 1)".format(argv[0])
   try:
-    opts, args = getopt.getopt(argv[1:], "hs:", ["help", "sigma="])
+    opts, args = getopt.getopt(argv[1:], "hs:t:", ["help", "sigma=", "terse="])
   except:
     print(arg_help)
     sys.exit(2)
@@ -58,22 +81,25 @@ def main(argv):
       print(arg_help)
       sys.exit(2)
     elif opt in ("-s", "--sigma"):
-      sigma = arg
+      sigma = float(arg)
+    elif opt in ("-t", "--terse"):
+      terse = bool(eval(arg))
   global p
   pearson = pd.read_csv('pearson.csv')
-  pearson.apply(get_frame, axis=1)
-  logger.info('Summarizing')
-  p['summary'] = p.apply(lambda row: summarize(row), axis=1)
-  # The below file is quite large and the information it contains is
-  # not so critical so we omit it.
-  # p.to_csv('list_dev.csv')
-  p = p['summary']
+  if terse:
+    pearson.apply(get_summarized_frame, axis=1)
+  else:
+    pearson.apply(get_frame, axis=1)
+    logger.info('Summarizing')
+    column_title = '>%.1f_sigma' % sigma
+    p[column_title] = p.apply(lambda row: summarize(row), axis=1)
+    p.to_csv('list_dev.csv')
+    p = p['summary']
   # Now the point is that we want to bin by hour ('H') or by day ('D')
   p = p.resample('H').sum()
   p.to_csv('summary_dev_hour_%s_sigma.csv' % sigma)
   p = p.resample('D').sum()
   p.to_csv('summary_dev_day_%s_sigma.csv' % sigma)
-  logger.info('Done')
   return
 
 if __name__ == '__main__':
