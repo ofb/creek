@@ -16,7 +16,7 @@ logger.addHandler(handler)
 p = pd.DataFrame()
 indices = []
 dev_directory = '/mnt/disks/creek-1/tf/dev'
-sigma = 2
+sigma = float(2)
 
 def get_frame(row):
   global p
@@ -69,7 +69,7 @@ def summarize(row):
 def main(argv):
   global sigma
   terse = 1
-  arg_help = "{0} -s <sigma> -t (default: sigma = 2, terse = 1)".format(argv[0])
+  arg_help = "{0} -s <sigma> -t <terse> (default: sigma = 2, terse = 1)".format(argv[0])
   try:
     opts, args = getopt.getopt(argv[1:], "hs:t:", ["help", "sigma=", "terse="])
   except:
@@ -95,11 +95,12 @@ def main(argv):
     p[column_title] = p.apply(lambda row: summarize(row), axis=1)
     p.to_csv('list_dev.csv')
     p = p['summary']
-  # Now the point is that we want to bin by hour ('H') or by day ('D')
+  p.to_csv('summary_dev_minute_%.1f_sigma.csv' % sigma)
+  # Now we bin by hour ('H') and by day ('D')
   p = p.resample('H').sum()
-  p.to_csv('summary_dev_hour_%s_sigma.csv' % sigma)
+  p.to_csv('summary_dev_hour_%.1f_sigma.csv' % sigma)
   p = p.resample('D').sum()
-  p.to_csv('summary_dev_day_%s_sigma.csv' % sigma)
+  p.to_csv('summary_dev_day_%.1f_sigma.csv' % sigma)
   return
 
 if __name__ == '__main__':
