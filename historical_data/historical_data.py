@@ -1,4 +1,3 @@
-
 import logging
 import logging.handlers
 import os
@@ -102,14 +101,14 @@ def get_shortable_equity_list():
   shortable_equity_symbols = {'symbol': shortable_equity_list}
   return pd.DataFrame(shortable_equity_symbols)
 
-
 def main(argv):
   num_symbols = 100
   interval = 'Hour'
   years = 10
-  arg_help = "{0} -b <number_of_symbols> -i <interval> -y <number_of_years> (default: number_of_symbols = 100, interval = Hour, number_of_years = 10)".format(argv[0])
+  transfer = 0
+  arg_help = "{0} -b <number_of_symbols> -i <interval> -y <number_of_years> -t <transfer> (default: number_of_symbols = 100, interval = Hour, number_of_years = 10, transfer = 0)".format(argv[0])
   try:
-    opts, args = getopt.getopt(argv[1:], "hb:i:y:", ["help", "number_of_symbols=", "interval=", "number_of_years="])
+    opts, args = getopt.getopt(argv[1:], "hb:i:y:t:", ["help", "number_of_symbols=", "interval=", "number_of_years=", "transfer="])
   except:
     print(arg_help)
     sys.exit(2)
@@ -124,17 +123,20 @@ def main(argv):
       interval = arg
     elif opt in ("-y", "--number_of_years"):
       years = int(arg)
+    elif opt in ("-t", "--transfer"):
+      transfer = bool(eval(arg))
   if interval not in ['Minute', 'Hour', 'Day']:
     print('Interval must be Minute, Hour, or Day (default Hour)')
     sys.exit(2)
-  path_in = input('Enter the path of the directory to save bars in: ')
-  path_in = os.path.expanduser(path_in)
-  if path_in[-1] == '/': path_in = path_in[:-1]
-  try:
-    assert(os.path.isdir(path_in)), 'Invalid path'
-  except Exception as e:
-    print(e)
-    sys.exit(2)
+  if not transfer:
+    path_in = input('Enter the path of the directory to save bars in: ')
+    path_in = os.path.expanduser(path_in)
+    if path_in[-1] == '/': path_in = path_in[:-1]
+    try:
+      assert(os.path.isdir(path_in)), 'Invalid path'
+    except Exception as e:
+      print(e)
+      sys.exit(2)
 #  shortable_list = get_shortable_equity_list();
 #  shortable_list.to_csv('shortable_equity_list.csv')
   shortable_list_df = pd.read_csv('symbols_%s_todo.csv' % interval)
@@ -145,9 +147,10 @@ def main(argv):
   print('Fetching %s symbols' % limit)
   for i in range(limit):
     symbol = shortable_list.pop(0)
-    logger.info('Fetching symbol %s, %s/%s' % (symbol, i+1, limit))
-    bars = compile_bars(symbol,years,interval)
-    bars.to_csv('%s/%s.csv' % (path_in, symbol))
+    if not transfer:
+      logger.info('Fetching symbol %s, %s/%s' % (symbol, i+1, limit))
+      bars = compile_bars(symbol,years,interval)
+      bars.to_csv('%s/%s.csv' % (path_in, symbol))
     processed_list.append(symbol)
   updated_symbol_list = pd.DataFrame({'symbol': shortable_list})
   updated_symbol_list.to_csv('symbols_%s_todo.csv' % interval)
