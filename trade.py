@@ -25,7 +25,8 @@ class Trade:
     _model: contains tensorflow model
     _has_model (bool): whether model weights have been successfully
                        loaded
-    _status: 'disabled', 'open', 'closed', 'opening', 'closing'.
+    _status: 'uninitialized, ''disabled', 'open', 'closed', 'opening', 
+             'closing'.
              'closed' means ready to trade. 'open' mean a position has 
              successfully been opened and the trade is on.
   """
@@ -44,17 +45,18 @@ class Trade:
     try:
       self._model.load_weights('%s/checkpoints/%s' % (root,self.title)).expect_partial()
       self._has_model = True
+      return 1
     except tf_errors.NotFoundError as e:
       logger.error(e)
       self._has_model = False
       self._status = 'disabled'
+      return 0
 
   def __init__(self, symbol1, symbol2):
     self.symbol1 = symbol1
     self.symbol2 = symbol2
     self.title = symbol1 + '-' + symbol2
-    self._LoadWeights()
-    if self._status = 'disabled': return
+    if not self._LoadWeights(): return
 
 # To minimize API calls, it's often useful to make a request for several 
 # trades at once.
