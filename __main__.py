@@ -20,7 +20,13 @@ active_symbols, trades = io.load_trades()
 closed_trades = []
 clock = signal.Clock()
 while not clock.is_open: clock.rest()
-asyncio.run(run.main(active_symbols, trades, closed_trades))
+asyncio.run(run.main(active_symbols, trades, closed_trades, clock))
 io.archive(closed_trades)
 io.report(trades, closed_trades)
 io.save(trades)
+
+'''
+To-do/notes
+- need to pass bars as a list to every method that needs them
+- make closed_trade class inherit trade class
+'''

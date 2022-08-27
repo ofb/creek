@@ -4,8 +4,9 @@ import asyncio
 import glob
 from creek import root
 from . import trade
+from . import signal
 
-async def get_bars():
+async def get_bars(symbols, clock):
   pass
 
 '''
@@ -45,10 +46,16 @@ def load_trades():
   return set(active_symbols), trades
 
 def archive(closed_trades):
+  logger = logging.getLogger(__name__)
+  logger.info('Archiving closed trades')
   pass
 
 def report(trades, closed_trades):
+  logger = logging.getLogger(__name__)
+  logger.info('Generating today\'s report')
   pass
 
 def save(trades):
+  logger = logging.getLogger(__name__)
+  logger.info('Saving open trades')
   pass

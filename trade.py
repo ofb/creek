@@ -10,6 +10,7 @@ import tensorflow_probability as tfp
 tfd = tfp.distributions
 from tensorflow.python.framework import errors_impl as tf_errors
 from creek import root
+from . import signal
 logger = logging.getLogger(__name__)
 
 # Things we want for our trade class:
@@ -74,5 +75,6 @@ class Trade:
 class TradeTableau:
   pass
 
-async def monitor():
+# Will add trades to the closed_trade list in-place
+async def monitor(trades, closed_trades, clock):
   pass

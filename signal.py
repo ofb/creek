@@ -5,8 +5,9 @@ import time
 import pytz as tz
 import alpaca.trading.client as ac
 from . import trade
-from . import key
-from . import secret_key
+from . import signal
+from creek import key
+from creek import secret_key
 
 class Clock():
   '''
@@ -45,5 +46,5 @@ class Clock():
       time.sleep(delta.seconds)
     self.refresh()
 
-async def main():
+async def main(trades, clock):
   pass
