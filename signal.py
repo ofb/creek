@@ -43,7 +43,7 @@ class Clock():
     if delta.seconds > 0:
       s = self.next_open.strftime("%m/%d/%Y %H:%M")
       logger.info('Market next open at %s; sleeping for %s' % (s,delta))
-      time.sleep(delta.seconds)
+      time.sleep(delta.seconds+62)
     self.refresh()
 
 async def main(trades, clock):

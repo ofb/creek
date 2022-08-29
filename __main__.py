@@ -15,7 +15,7 @@ logging.basicConfig(
   handlers=[logging.handlers.WatchedFileHandler(os.environ.get("LOGFILE", "creek.log"))]
 )
 # Load trade objects including open trade objects
-t = trade.Trade('AVB','AIRC','0.9','0.94')
+t = trade.Trade('AVB','AIRC', 0.9, 0.94, (1,1), (1,1), (1,1), (1,1))
 active_symbols, trades = io.load_trades()
 closed_trades = []
 clock = signal.Clock()

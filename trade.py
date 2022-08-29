@@ -55,7 +55,8 @@ class Trade:
       self._status = 'disabled'
       return 0
 
-  def __init__(self, symbol1, symbol2, pearson, pearson_historical):
+  def __init__(self, symbol1, symbol2, pearson, pearson_historical,
+               tradable, marginable, shortable, fractionable):
     self._status = 'uninitialized'
     self.symbol1 = symbol1
     self.symbol2 = symbol2
@@ -63,11 +64,21 @@ class Trade:
     self._pearson_historical = pearson_historical
     self.title = symbol1 + '-' + symbol2
     if not self._LoadWeights(): return
+    self.tradable = tradable
+    if not self.tradable[0] or not self.tradable[1]: 
+      self._status = 'disabled'
+    self.marginable = marginable
+    self.shortable = shortable
+    if not self.tradable[0] or not self.tradable[1]: 
+      self._status = 'disabled'
+    self.fractionable = fractionable
     # ...
     self._status = 'closed'
   
   # To initialize already-open trades
-  def initialize(dict):
+  def open_init(dict):
+    # ...
+    self._status = 'open'
     pass
 
 # To minimize API calls, it's often useful to make a request for several 
