@@ -2,22 +2,26 @@ import logging
 import pandas as pd
 import asyncio
 import glob
-import requests
+from datetime import datetime as dt
+from alpaca.trading.client import TradingClient
+from alpaca.trading.requests import GetAssetsRequest
+from alpaca.trading.enums import AssetClass
 from creek import root
 from creek import key
 from creek import secret_key
-from creek import url_v2
+import __main__
 from . import trade
 from . import signal
 
 def get_assets():
-  headers = {'APCA-API-KEY-ID': key, 'APCA-API-SECRET-KEY': secret_key}
-  url = url_v2
-  r = requests.get(url + 'assets', headers=headers)
-  d = {}
-  for element in r.json():
-    d[r['symbol']] = element
-  return d
+  trading_client = TradingClient(
+    'PK52PMRHMCY15OZGMZLW','F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh')
+  search_params = GetAssetsRequest(asset_class=AssetClass.US_EQUITY)
+  assets = trading_client.get_all_assets(search_params)
+  assets_dict = {}
+  for a in assets:
+    assets_dict[a.symbol] = a
+  return assets_dict
 '''
 Saving/restoring trade objects
 '''
@@ -25,17 +29,19 @@ def read_trade(path):
   open_trade_df = pd.read_csv(open_trade, index_col=0)
   open_trade_df.set_index('index', inplace=True)
   open_trade = open_trade_df.to_dict()[0]
+  tradable = (bool(eval(open_trade['symbol1_tradable'])),
+              bool(eval(open_trade['symbol2_tradable'])))
+  marginable = (bool(eval(open_trade['symbol1_marginable'])),
+                bool(eval(open_trade['symbol2_marginable'])))
+  shortable = (bool(eval(open_trade['symbol1_shortable'])),
+               bool(eval(open_trade['symbol2_shortable'])))
+  fractionable = (bool(eval(open_trade['symbol1_fractionable'])),
+                  bool(eval(open_trade['symbol2_fractionable'])))
+
   t = trade.Trade(open_trade['symbol1'], 
                   open_trade['symbol2'], float(open_trade['pearson']),
                   float(open_trade['pearson_historical']),
-                  (bool(eval(open_trade['symbol1_tradable'])),
-                   bool(eval(open_trade['symbol2_tradable'])))
-                  (bool(eval(open_trade['symbol1_marginable'])),
-                   bool(eval(open_trade['symbol2_marginable'])))
-                  (bool(eval(open_trade['symbol1_shortable'])),
-                   bool(eval(open_trade['symbol2_shortable'])))
-                  (bool(eval(open_trade['symbol1_fractionable'])),
-                   bool(eval(open_trade['symbol2_fractionable']))))
+                  tradable, marginable, shortable, fractionable)
   t.open_init(open_trade)
   return t
 
@@ -53,18 +59,14 @@ def load_trades():
     symbols = title.split('-')
     active_symbols.extend(symbols)
     trades[title] = read_trade(open_trade)
-    trades[title].tradable = (
-      bool(eval(assets[symbols[0]]['tradable'])),
-      bool(eval(assets[symbols[1]]['tradable'])))
-    trades[title].marginable = (
-      bool(eval(assets[symbols[0]]['marginable'])),
-      bool(eval(assets[symbols[1]]['marginable'])))
-    trades[title].shortable = (
-      bool(eval(assets[symbols[0]]['shortable'])),
-      bool(eval(assets[symbols[1]]['shortable'])))
-    trades[title].fractionable = (
-      bool(eval(assets[symbols[0]]['fractionable'])),
-      bool(eval(assets[symbols[1]]['fractionable'])))
+    trades[title].tradable = (assets[symbols[0]].tradable,
+                              assets[symbols[1]].tradable)
+    trades[title].marginable = (assets[symbols[0]].marginable,
+                                assets[symbols[1]].marginable)
+    trades[title].shortable = (assets[symbols[0]].shortable,
+                               assets[symbols[1]].shortable)
+    trades[title].fractionable = (assets[symbols[0]].fractionable,
+                                  assets[symbols[1]].fractionable)
   logger.info('Loading remaining tensorflow models')
   for index, row in pearson.iterrows():
     title = row['symbol1'] + '-' + row['symbol2']
@@ -73,17 +75,23 @@ def load_trades():
       trades[title].pearson_historical= float(row['pearson_historical'])
     if title not in trades.keys():
       active_symbols.extend([row['symbol1'],row['symbol2']])
+      tradable = (assets[row['symbol1']].tradable,
+                  assets[row['symbol2']].tradable)
+      marginable = (assets[row['symbol1']].marginable,
+                    assets[row['symbol2']].marginable)
+      shortable = (assets[row['symbol1']].shortable,
+                   assets[row['symbol2']].shortable)
+      fractionable = (assets[row['symbol1']].fractionable,
+                      assets[row['symbol2']].fractionable)
       trades[title] = trade.Trade(row['symbol1'], row['symbol2'], 
         float(row['pearson']), float(row['pearson_historical']),
-        (bool(eval(assets[row['symbol1']]['tradable'])),
-        bool(eval(assets[row['symbol2']]['tradable'])))
-        (bool(eval(assets[row['symbol1']]['marginable'])),
-        bool(eval(assets[row['symbol2']]['marginable'])))
-        (bool(eval(assets[row['symbol1']]['shortable'])),
-        bool(eval(assets[row['symbol2']]['shortable'])))
-        (bool(eval(assets[row['symbol1']]['fractionable'])),
-        bool(eval(assets[row['symbol2']]['fractionable']))))
+        tradable, marginable, shortable, fractionable)
   return set(active_symbols), trades
+
+async def bar_data_handler(bar):
+  logger = logging.getLogger(__name__)
+  __main__.bars[bar.symbol].append(bar)
+  logger.info('%s received' % bar.symbol)
 
 def archive(closed_trades):
   logger = logging.getLogger(__name__)

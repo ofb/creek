@@ -2,10 +2,10 @@ import os
 import logging
 import logging.handlers
 import asyncio
+from alpaca.data.live import StockDataStream
 from . import trade
 from . import io
 from . import signal
-from . import run
 from . import key
 from . import secret_key
 
@@ -18,9 +18,24 @@ logging.basicConfig(
 t = trade.Trade('AVB','AIRC', 0.9, 0.94, (1,1), (1,1), (1,1), (1,1))
 active_symbols, trades = io.load_trades()
 closed_trades = []
+bars = {}
+for symbol in active_symbols:
+  bars[symbol] = []
 clock = signal.Clock()
 while not clock.is_open: clock.rest()
-asyncio.run(run.main(active_symbols, trades, closed_trades, clock))
+'''
+We run two concurrent asyncronous coroutines:
+1) get minute bars at two seconds past the minute, check for signals at
+five seconds past the minute and initiate trades
+2) monitor account trade status and update trades as necessary
+'''
+wss_client = StockDataStream(key, secret_key)
+wss_client.subscribe_bars(io.bar_data_handler, *active_symbols)
+wss_client.run()
+async def main():
+  await asyncio.gather(wss_client.run(), signal.main(), 
+                       trade.monitor())
+asyncio.run(main())
 io.archive(closed_trades)
 io.report(trades, closed_trades)
 io.save(trades)
