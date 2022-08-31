@@ -9,8 +9,7 @@ tf.enable_v2_behavior()
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 from tensorflow.python.framework import errors_impl as tf_errors
-from creek import root
-from . import signal
+from . import g
 logger = logging.getLogger(__name__)
 
 # Things we want for our trade class:
@@ -46,7 +45,7 @@ class Trade:
                 optimizer=tf.optimizers.Adam(learning_rate=0.01),
                 loss=negloglik)
     try:
-      self._model.load_weights('%s/checkpoints/%s' % (root,self.title)).expect_partial()
+      self._model.load_weights('%s/checkpoints/%s' % (g.root,self._title)).expect_partial()
       self._has_model = True
       return 1
     except tf_errors.NotFoundError as e:
@@ -55,37 +54,48 @@ class Trade:
       self._status = 'disabled'
       return 0
 
-  def __init__(self, symbol1, symbol2, pearson, pearson_historical,
-               tradable, marginable, shortable, fractionable):
+  def __init__(self, symbol_list, pearson, pearson_historical):
     self._status = 'uninitialized'
-    self.symbol1 = symbol1
-    self.symbol2 = symbol2
+    assert len(symbol_list) == 2
+    self._symbols = symbol_list
+    assert type(pearson) is float
+    assert type(pearson_historical) is float
     self._pearson = pearson
     self._pearson_historical = pearson_historical
-    self.title = symbol1 + '-' + symbol2
+    self._title = self._symbols[0].symbol + '-' + self._symbols[1].symbol
     if not self._LoadWeights(): return
-    self.tradable = tradable
-    if not self.tradable[0] or not self.tradable[1]: 
+    if not self._symbols[0].tradable or not self._symbols[1].tradable:
       self._status = 'disabled'
-    self.marginable = marginable
-    self.shortable = shortable
-    if not self.tradable[0] or not self.tradable[1]: 
+    if not self._symbols[0].shortable or not self._symbols[1].shortable:
       self._status = 'disabled'
-    self.fractionable = fractionable
     # ...
     self._status = 'closed'
+
+  def refresh_open(self, symbol_list):
+    assert len(symbol_list) == 2
+    self._symbols = symbol_list
+    if not self._symbols[0].tradable or not self._symbols[1].tradable:
+      self._status = 'disabled'
+      return 0
+    else: return 1
+  
+  def status(self): return self._status
+  def pearson(self): return self._pearson
+
+  def open_signal(self):
+    if self._symbols[0] == 'AIRC' and self._symbols[1] == 'AVB':
+      logger.info('Opening AIRC-AVB')
+      return 1, 'AIRC', 'AVB'
+    else: return 0
+  def close_signal(self):
+    return 0
+  # async def close(self):
+  #   pass
+  # async def try_close(self):
+  #   pass
   
   # To initialize already-open trades
   def open_init(dict):
     # ...
     self._status = 'open'
     pass
-
-# To minimize API calls, it's often useful to make a request for several 
-# trades at once.
-class TradeTableau:
-  pass
-
-# Will add trades to the closed_trade list in-place
-async def monitor(trades, closed_trades, clock):
-  pass
