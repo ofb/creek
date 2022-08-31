@@ -27,7 +27,7 @@ g.active_symbols, g.trades = io.load_trades()
 for symbol in g.active_symbols.keys():
   g.bars[symbol] = []
 clock = signal.Clock()
-# while not clock.is_open: clock.rest()
+while not clock.is_open: clock.rest()
 s = threading.Thread(target=io.stock_wss, daemon=True)
 s.start()
 time.sleep(10) # to prevent circular import
@@ -44,8 +44,3 @@ while ((clock.next_close - clock.now())
 io.archive(g.closed_trades)
 io.report(g.trades, g.closed_trades)
 io.save(g.trades)
-
-'''
-To-do/notes
-- make closed_trade class inherit trade class
-'''

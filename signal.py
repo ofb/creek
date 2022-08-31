@@ -78,7 +78,7 @@ async def main(clock):
   if ((time.time() - start) > 60) and ((clock.next_close
       - now) >= dt.timedelta(seconds=59)): return
   elif ((clock.next_close - now)
-        > dt.timedelta(seconds=59)):
+        >= dt.timedelta(seconds=58)):
     if now.second==0: delta = 1-now.microsecond/1000000
     elif now.second<=2: return
     else: delta = 61-now.second-now.microsecond/1000000
