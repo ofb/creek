@@ -9,7 +9,7 @@ from alpaca.trading.enums import AssetClass
 from alpaca.data.live import StockDataStream
 from alpaca.trading.stream import TradingStream
 from alpaca.trading.models import Asset
-from . import g
+from . import config as g
 from . import trade
 from . import signal
 
@@ -112,7 +112,8 @@ def stock_wss():
 async def bar_data_handler(bar):
   logger = logging.getLogger(__name__)
   g.bars[bar.symbol].append(bar)
-  logger.info('%s received' % bar.symbol)
+  if bar.symbol == 'AIRC':
+    logger.info('bars received')
 
 def account_wss():
   trading_stream = TradingStream(g.key, g.secret_key, paper=g.is_paper)

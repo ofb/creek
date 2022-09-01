@@ -9,7 +9,7 @@ tf.enable_v2_behavior()
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 from tensorflow.python.framework import errors_impl as tf_errors
-from . import g
+from . import config as g
 logger = logging.getLogger(__name__)
 
 # Things we want for our trade class:
@@ -86,7 +86,7 @@ class Trade:
     if self._symbols[0] == 'AIRC' and self._symbols[1] == 'AVB':
       logger.info('Opening AIRC-AVB')
       return 1, 'AIRC', 'AVB'
-    else: return 0
+    else: return 0, None, None
   def close_signal(self):
     return 0
   # async def close(self):

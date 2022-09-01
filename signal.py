@@ -1,13 +1,14 @@
 import logging
 import asyncio
 from  datetime import datetime as dt
+from datetime import timedelta as td
 import time
 import pytz as tz
 import pandas as pd
 import alpaca.trading.client as ac
 from . import trade
 from . import signal
-from . import g
+from . import config as g
 
 class Clock():
   '''
@@ -23,6 +24,9 @@ class Clock():
     delta = dt.now(tz=tz.timezone('US/Eastern')) - ac_clock.timestamp
     if abs(delta.total_seconds()) < 1: self._local = True
     else: self._local = False
+    logger = logging.getLogger(__name__)
+    if self._local: logger.info('Using local clock')
+    else: logger.info('Using Alpaca clock')
     self.is_open = ac_clock.is_open
     self.next_open = ac_clock.next_open
     self.next_close = ac_clock.next_close
@@ -54,16 +58,15 @@ def available_trades():
 
 async def main(clock):
   logger = logging.getLogger(__name__)
-  logger.info('Entering main')
+  logger.info('Entering main; len(AIRC) = %s' % len(g.bars['AIRC']))
   start = time.time()
-  now = clock.now()
   to_close = []
   to_open = {}
-  for key, trade in g.trades:
+  for key, trade in g.trades.items():
     if trade.status() == 'open':
       if trade.close_signal(bars): to_close.append(key)
     elif trade.status() == 'closed':
-      o, l, s = trade.open_signal(bars)
+      o, l, s = trade.open_signal()
       if o: to_open[key] = [trade.pearson(), l, s]
   to_open_df = pd.DataFrame.from_dict(to_open, orient='index',
                                      columns=['pearson','long','short'])
@@ -71,16 +74,16 @@ async def main(clock):
   remove_concentration(to_open_df)
   n = available_trades()
   await asyncio.gather(*(g.trades[k].close() for k in to_close),
-    *(g.trades[k].try_open() for k in to_open_s[:n].index))
-    
+    *(g.trades[k].try_open() for k in to_open_df[:n].index))
   
+  if time.time() - start < 2: time.sleep(2)
   now = clock.now()
   if ((time.time() - start) > 60) and ((clock.next_close
-      - now) >= dt.timedelta(seconds=59)): return
-  elif ((clock.next_close - now)
-        >= dt.timedelta(seconds=58)):
+      - now) >= td(seconds=59)): return
+  elif ((clock.next_close - now) >= td(seconds=58)):
     if now.second==0: delta = 1-now.microsecond/1000000
     elif now.second<=2: return
     else: delta = 61-now.second-now.microsecond/1000000
+    logger.info('Sleeping for %s seconds' % delta)
     time.sleep(delta)
     return
