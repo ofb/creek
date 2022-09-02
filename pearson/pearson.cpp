@@ -126,7 +126,7 @@ int main ()
 	// Get starting timepoint
 	auto start = high_resolution_clock::now();
 	// must complile with openmp: g++ -fopenmp pearson.cpp
-	#pragma omp parallel for
+	#pragma omp parallel for schedule (static,1)
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N-i-1; j++) {
 			pearson(database[i], database[i+j+1], results[i][j]);
