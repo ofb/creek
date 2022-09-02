@@ -14,7 +14,7 @@ from . import config as g
 logging.basicConfig(
   level=logging.INFO,
   format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
-  handlers=[logging.handlers.WatchedFileHandler(os.environ.get("LOGFILE", "creek-1.log"))]
+  handlers=[logging.handlers.WatchedFileHandler(os.environ.get("LOGFILE", "creek.log"))]
 )
 logger = logging.getLogger(__name__)
 # Load trade objects including open trade objects
@@ -24,6 +24,8 @@ AVB = trading_client.get_asset('AVB')
 AIRC = trading_client.get_asset('AIRC')
 t = trade.Trade([AVB, AIRC], 0.9, 0.94)
 
+if not trade.account_ok(): return
+trade.set_trade_size()
 g.active_symbols, g.trades = io.load_trades()
 for symbol in g.active_symbols.keys():
   g.bars[symbol] = []

@@ -3,7 +3,6 @@ import pandas as pd
 import asyncio
 import glob
 from datetime import datetime as dt
-from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import GetAssetsRequest
 from alpaca.trading.enums import AssetClass
 from alpaca.data.live import StockDataStream
@@ -14,9 +13,8 @@ from . import trade
 from . import signal
 
 def get_assets():
-  trading_client = TradingClient(g.key, g.secret_key)
   search_params = GetAssetsRequest(asset_class=AssetClass.US_EQUITY)
-  assets = trading_client.get_all_assets(search_params)
+  assets = g.tclient.get_all_assets(search_params)
   assets_dict = {}
   for a in assets:
     assets_dict[a.symbol] = a

@@ -2,6 +2,7 @@ import logging
 import asyncio
 from  datetime import datetime as dt
 from datetime import timedelta as td
+import math
 import time
 import pytz as tz
 import pandas as pd
@@ -19,8 +20,7 @@ class Clock():
                 the machine time.
   '''
   def __init__(self):
-    self._client = ac.TradingClient(g.key, g.secret_key)
-    ac_clock = self._client.get_clock()
+    ac_clock = g.tclient.get_clock()
     delta = dt.now(tz=tz.timezone('US/Eastern')) - ac_clock.timestamp
     if abs(delta.total_seconds()) < 1: self._local = True
     else: self._local = False
@@ -32,14 +32,14 @@ class Clock():
     self.next_close = ac_clock.next_close
 
   def refresh(self):
-    ac_clock = self._client.get_clock()
+    ac_clock = g.tclient.get_clock()
     self.is_open = ac_clock.is_open
     self.next_open = ac_clock.next_open
     self.next_close = ac_clock.next_close
 
   def now(self):
     if self._local: return dt.now(tz=tz.timezone('US/Eastern'))
-    else: return self._client.get_clock().timestamp
+    else: return g.tclient.get_clock().timestamp
 
   def rest(self):
     logger = logging.getLogger(__name__)
@@ -50,11 +50,35 @@ class Clock():
       time.sleep(delta.seconds)
     self.refresh()
 
+'''
+We want to make sure we don't become overconcentrated in one symbol
+across several trades. The global parameter MAX_SYMBOL determines the
+maximum allowed exposure to any one symbol as a percentage of total
+equity.
+'''
 def remove_concentration(to_open):
   return to_open
 
+'''
+The following method determines the number of trades that can be opened
+by dividing free capital by the max position size, which is defined as
+total capital times the global parameter MAX_TRADE_SIZE and is set in
+trade.set_trade_size() at the beginning of the day.
+'''
 def available_trades():
-  return 1000
+  cash = g.tclient.get_account().cash
+  return math.floor(cash / g.trade_size)
+
+'''
+The following method compares utilization and missed trades to determine
+whether the sigma threshold (global parameter TO_OPEN_SIGNAL) should be 
+raised or lowered.
+- A missed trade is a trade where the signal fired but which wasn't 
+opened due to lack of available free capital.
+- Utilization is measured as a percentage of free capital.
+'''
+def retarget():
+  pass
 
 async def main(clock):
   logger = logging.getLogger(__name__)
@@ -73,8 +97,10 @@ async def main(clock):
   to_open_df.sort_values(by='pearson', ascending=False, inplace=True)
   remove_concentration(to_open_df)
   n = available_trades()
-  await asyncio.gather(*(g.trades[k].close() for k in to_close),
+  await asyncio.gather(*(g.trades[k].try_close() for k in to_close),
     *(g.trades[k].try_open() for k in to_open_df[:n].index))
+
+  retarget()
   
   if time.time() - start < 2: time.sleep(2)
   now = clock.now()

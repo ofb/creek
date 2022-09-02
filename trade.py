@@ -10,7 +10,6 @@ import tensorflow_probability as tfp
 tfd = tfp.distributions
 from tensorflow.python.framework import errors_impl as tf_errors
 from . import config as g
-logger = logging.getLogger(__name__)
 
 # Things we want for our trade class:
 # have a status
@@ -34,6 +33,7 @@ class Trade:
   """
 
   def _LoadWeights(self):
+    logger = logging.getLogger(__name__)
     negloglik = lambda y, rv_y: -rv_y.log_prob(y)
     self._model = tf.keras.Sequential([
     tf.keras.layers.Dense(1 + 1),
@@ -81,21 +81,52 @@ class Trade:
   
   def status(self): return self._status
   def pearson(self): return self._pearson
+  def title(self): return self._title
 
   def open_signal(self):
-    if self._symbols[0] == 'AIRC' and self._symbols[1] == 'AVB':
+    logger = logging.getLogger(__name__)
+    if self._symbols[0].symbol == 'AIRC' and self._symbols[1].symbol == 'AVB':
       logger.info('Opening AIRC-AVB')
       return 1, 'AIRC', 'AVB'
     else: return 0, None, None
   def close_signal(self):
     return 0
-  # async def close(self):
-  #   pass
-  # async def try_close(self):
-  #   pass
+  async def try_close(self):
+    pass
+
+  async def try_open(self):
+    '''
+    Important To-Do:
+    - Ensure bid-ask spread is a sufficiently small percentage of sigma.
+    '''
+    pass
   
   # To initialize already-open trades
   def open_init(dict):
     # ...
     self._status = 'open'
     pass
+
+def account_ok():
+  logger = logging.getLogger(__name__)
+  account = g.tclient.get_account()
+  if account.trading_blocked:
+    logger.error('Trading blocked, exiting')
+    return 0
+  if account.account_blocked:
+    logger.error('Account blocked, exiting')
+    return 0
+  if trade_suspended_by_user:
+    logger.error('Trade suspended by user, exiting')
+    return 0
+  if not account.shorting_enabled:
+    logger.error('Shorting disabled, exiting')
+    return 0
+  return 1
+
+def set_trade_size():
+  logger = logging.getLogger(__name__)
+  equity = g.tclient.get_account().equity
+  g.trade_size = equity * g.MAX_TRADE_SIZE
+  logger.info('trade_size = %s' % g.trade_size)
+  return
