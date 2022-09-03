@@ -74,6 +74,8 @@ def remove_concentration(to_open):
   positions_d = {}
   for p in g.positions:
     positions_d[p.symbol] = p
+  longs = {}
+  shorts = {}
   # Find how many new [long,short] positions we have room for in symbol
   for key in g.active_symbols.keys():
     position = positions_d[key]
@@ -89,7 +91,15 @@ def remove_concentration(to_open):
     s = to_open['short'].to_list().count(key)
     net = l-s
     if net > longs:
+      # diff = net - longs
+      mask = ((df['long']!=key) |
+              (to_open.groupby('long').cumcount() <= l - (net - longs)))
+      to_open = to_open[mask]
     elif net < -shorts:
+      # diff = -(net - (-shorts)) = -net - shorts
+      mask = ((df['short']!=key) |
+              (to_open.groupby('short').cumcount() <= s -(-net-shorts)))
+      to_open = to_open[mask]
   return to_open
 
 '''
