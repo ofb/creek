@@ -71,16 +71,18 @@ a pair that undergoes a large tandem price movement, the cost basis is
 a better measure of exposure.
 '''
 def remove_concentration(to_open):
+  logger = logging.getLogger(__name__)
   positions_d = {}
   for p in g.positions:
+    if p.symbol in positions_d.keys():
+      logger.error('Multiple positions in the same symbol.')
     positions_d[p.symbol] = p
-  longs = {}
-  shorts = {}
-  # Find how many new [long,short] positions we have room for in symbol
   for key in g.active_symbols.keys():
-    position = positions_d[key]
-    sign = 1 if position.side == 'long' else -1
-    frac_position = sign * position.cost_basis / g.equity
+    if key in positions_d.keys():
+      position = positions_d[key]
+      sign = 1 if position.side == 'long' else -1
+      frac_position = sign * position.cost_basis / g.equity
+    else: frac_position = 0
     # frac_position + longs * g.MAX_TRADE_SIZE / 2 <= g.MAX_SYMBOL
     longs = math.floor((g.MAX_SYMBOL
                              -frac_position)*2/g.MAX_TRADE_SIZE)
