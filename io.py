@@ -134,4 +134,5 @@ def report(trades, closed_trades):
 def save(trades):
   logger = logging.getLogger(__name__)
   logger.info('Saving open trades')
+  # Remember to save g.TO_OPEN_SIGNAL
   pass

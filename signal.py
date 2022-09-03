@@ -51,12 +51,45 @@ class Clock():
     self.refresh()
 
 '''
+Most trades will barely exceed the threshold, and those should be sorted
+by their pearson coefficients. Some, however, will materially exceed the 
+threshold, and those should be sorted by their deviation.
+'''
+def sort_trades(to_open):
+  to_open_outliers = to_open[to_open_df['dev'] > 1.1 * g.TO_OPEN_SIGNAL]
+  to_open_bulk = to_open[to_open_df['dev'] <= 1.1 * g.TO_OPEN_SIGNAL]
+  to_open_outliers.sort_values(by='dev',ascending=False,inplace=True)
+  to_open_bulk.sort_values(by='pearson',ascending=False,inplace=True)
+  return pd.concat([to_open_outliers,to_open_bulk])
+
+'''
 We want to make sure we don't become overconcentrated in one symbol
 across several trades. The global parameter MAX_SYMBOL determines the
 maximum allowed exposure to any one symbol as a percentage of total
-equity.
+equity. We go by cost basis rather than market value because if we have
+a pair that undergoes a large tandem price movement, the cost basis is
+a better measure of exposure.
 '''
 def remove_concentration(to_open):
+  positions_d = {}
+  for p in g.positions:
+    positions_d[p.symbol] = p
+  # Find how many new [long,short] positions we have room for in symbol
+  for key in g.active_symbols.keys():
+    position = positions_d[key]
+    sign = 1 if position.side == 'long' else -1
+    frac_position = sign * position.cost_basis / g.equity
+    # frac_position + longs * g.MAX_TRADE_SIZE / 2 <= g.MAX_SYMBOL
+    longs = math.floor((g.MAX_SYMBOL
+                             -frac_position)*2/g.MAX_TRADE_SIZE)
+    # frac_position - shorts * g.MAX_TRADE_SIZE / 2 >= -g.MAX_SYMBOL
+    shorts = math.floor((g.MAX_SYMBOL
+                              +frac_position)*2/g.MAX_TRADE_SIZE)
+    l = to_open['long'].to_list().count(key)
+    s = to_open['short'].to_list().count(key)
+    net = l-s
+    if net > longs:
+    elif net < -shorts:
   return to_open
 
 '''
@@ -77,8 +110,23 @@ raised or lowered.
 opened due to lack of available free capital.
 - Utilization is measured as a percentage of free capital.
 '''
-def retarget():
-  pass
+def retarget(clock):
+  logger = logging.getLogger(__name__)
+  now = clock.now()
+  if (30 <= now.minute < 40) and len(g.retarget['missed']) > 15 and len(g.retarget['util']) > 15:
+    util = sum(g.retarget['util'])/len(g.retarget['util'])
+    missed = sum(g.retarget['missed'])
+    if util + missed * g.MAX_TRADE_SIZE < 0.95:
+      logger.info('Last hour util: %s. Last hour missed trades: %s. Lowering TO_OPEN_SIGNAL from %s to %s' % (util, missed, g.TO_OPEN_SIGNAL, g.TO_OPEN_SIGNAL - 0.1))
+      g.TO_OPEN_SIGNAL = g.TO_OPEN_SIGNAL - 0.1
+      g.retarget['missed'].clear()
+      g.retarget['util'].clear()
+    elif util + missed * g.MAX_TRADE_SIZE > 1.05:
+      logger.info('Last hour util: %s. Last hour missed trades: %s. Raising TO_OPEN_SIGNAL from %s to %s' % (util, missed, g.TO_OPEN_SIGNAL, g.TO_OPEN_SIGNAL + 0.1))
+      g.TO_OPEN_SIGNAL = g.TO_OPEN_SIGNAL + 0.1
+      g.retarget['missed'].clear()
+      g.retarget['util'].clear()
+  return
 
 async def main(clock):
   logger = logging.getLogger(__name__)
@@ -90,17 +138,28 @@ async def main(clock):
     if trade.status() == 'open':
       if trade.close_signal(bars): to_close.append(key)
     elif trade.status() == 'closed':
-      o, l, s = trade.open_signal()
-      if o: to_open[key] = [trade.pearson(), l, s]
+      o, d, l, s = trade.open_signal()
+      if o: to_open[key] = [trade.pearson(), d, l, s]
   to_open_df = pd.DataFrame.from_dict(to_open, orient='index',
-                                     columns=['pearson','long','short'])
-  to_open_df.sort_values(by='pearson', ascending=False, inplace=True)
-  remove_concentration(to_open_df)
+               columns=['pearson','dev','long','short'])
+  to_open_df = sort_trades(to_open_df)
+  to_open_df = remove_concentration(to_open_df)
   n = available_trades()
   await asyncio.gather(*(g.trades[k].try_close() for k in to_close),
     *(g.trades[k].try_open() for k in to_open_df[:n].index))
+  
+  g.retarget['missed'].append(max(0,len(to_open_df) - n))
+  account = g.tclient.get_account()
+  g.retarget['util'].append(1 - account.cash / account.equity)
+  retarget(clock)
+  # Give a moment for positions to update from the recent trades
+  if time.time() - start < 55: time.sleep(2)
+  # Get positions after trades have settled
+  g.equity = account.equity
+  g.positions = g.tclient.get_all_positions() # List[Position]
+  if not set(positions_d.keys()) <= set(g.active_symbols.keys()):
+    logger.warning('There are unknown open positions.')
 
-  retarget()
   
   if time.time() - start < 2: time.sleep(2)
   now = clock.now()

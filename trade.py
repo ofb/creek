@@ -84,13 +84,23 @@ class Trade:
   def title(self): return self._title
 
   def open_signal(self):
+  '''
+  Returns a 4-tuple with the
+  - pearson coefficent for the pair
+  - deviation as a fraction of the standard deviation
+  - the symbol to go long
+  - the symbol to go short
+  '''
     logger = logging.getLogger(__name__)
     if self._symbols[0].symbol == 'AIRC' and self._symbols[1].symbol == 'AVB':
       logger.info('Opening AIRC-AVB')
-      return 1, 'AIRC', 'AVB'
-    else: return 0, None, None
+      dev = 3.4
+      return self._pearson, dev, 'AIRC', 'AVB'
+    else: return 0, 0, None, None
+
   def close_signal(self):
     return 0
+
   async def try_close(self):
     pass
 
@@ -122,6 +132,8 @@ def account_ok():
   if not account.shorting_enabled:
     logger.error('Shorting disabled, exiting')
     return 0
+  g.equity = account.equity
+  g.positions = g.tclient.get_all_positions()
   return 1
 
 def set_trade_size():

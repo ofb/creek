@@ -3,14 +3,17 @@ from alpaca.trading.client import TradingClient
 root = '/mnt/disks/creek-1/creek'
 key = 'PK52PMRHMCY15OZGMZLW'
 secret_key = 'F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh'
+is_paper = True
 tclient = TradingClient(key, secret_key)
 
-is_paper = True
-active_symbols = {}
-trades = {}
+active_symbols = {} # 'SYMBOL': <Symbol_Object>
+trades = {} # 'SYMBOL1-SYMBOL2': <Trade_Object>
 closed_trades = []
-bars = {}
+bars = {} # 'SYMBOL': [<Bar>]
 trade_size = 0.0
+retarget = {'missed':[],'util':[]}
+equity = 0.0
+positions = []
 
 '''
 MAX_SYMBOL is the upper bound for the overall position in any one symbol
