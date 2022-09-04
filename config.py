@@ -12,6 +12,7 @@ closed_trades = []
 bars = {} # 'SYMBOL': [<Bar>]
 trade_size = 0.0
 retarget = {'missed':[],'util':[]}
+cash = 0.0
 equity = 0.0
 positions = []
 

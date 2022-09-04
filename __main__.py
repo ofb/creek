@@ -24,7 +24,8 @@ AVB = trading_client.get_asset('AVB')
 AIRC = trading_client.get_asset('AIRC')
 t = trade.Trade([AVB, AIRC], 0.9, 0.94)
 
-if not trade.account_ok(): return
+# Also sets g.cash, g.equity, g.positions
+if not trade.account_ok(): sys.exit(1)
 trade.set_trade_size()
 g.active_symbols, g.trades = io.load_trades()
 for symbol in g.active_symbols.keys():

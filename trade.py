@@ -9,6 +9,7 @@ tf.enable_v2_behavior()
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 from tensorflow.python.framework import errors_impl as tf_errors
+import numpy as np
 from . import config as g
 
 # Things we want for our trade class:
@@ -45,7 +46,8 @@ class Trade:
                 optimizer=tf.optimizers.Adam(learning_rate=0.01),
                 loss=negloglik)
     try:
-      self._model.load_weights('%s/checkpoints/%s' % (g.root,self._title)).expect_partial()
+      self._model.load_weights('%s/checkpoints/%s' % 
+                               (g.root,self._title)).expect_partial()
       self._has_model = True
       return 1
     except tf_errors.NotFoundError as e:
@@ -68,6 +70,7 @@ class Trade:
       self._status = 'disabled'
     if not self._symbols[0].shortable or not self._symbols[1].shortable:
       self._status = 'disabled'
+    self._sigma_series = pd.Series(dtype=np.float64)
     # ...
     self._status = 'closed'
 
@@ -82,6 +85,27 @@ class Trade:
   def status(self): return self._status
   def pearson(self): return self._pearson
   def title(self): return self._title
+
+  def _mean(self, x):
+    val = np.array([[x]], dtype=np.float32)
+    return float(np.squeeze(self._model(val).mean().numpy()))
+
+  def _stddev(self, x):
+    val = np.array([[x]], dtype=np.float32)
+    return float(np.squeeze(self._model(val).stddev().numpy()))
+
+  def _sigma(self, x, y):
+    return abs(y - self._mean(x)) / self._stddev(x)
+
+  def append_bar(self):
+    if (not g.bars[self._symbols[0].symbol] or
+        not g.bars[self._symbols[1].symbol]): return
+    new_bars = (g.bars[self._symbols[0].symbol][-1],
+                g.bars[self._symbols[1].symbol][-1])
+    time = max(new_bars[0].timestamp, new_bars[1].timestamp)
+    sigma = self._sigma(new_bars[0].vwap, new_bars[1].vwap)
+    s = pd.Series({time,sigma})
+    self._sigma_series = pd.concat([self._sigma_series,s])
 
   def open_signal(self):
   '''
@@ -117,6 +141,10 @@ class Trade:
     self._status = 'open'
     pass
 
+def equity(account): return max(account.equity - g.EXCESS_CAPITAL,1)
+
+def cash(account): return max(account.cash - g.EXCESS_CAPITAL,0)
+
 def account_ok():
   logger = logging.getLogger(__name__)
   account = g.tclient.get_account()
@@ -132,13 +160,13 @@ def account_ok():
   if not account.shorting_enabled:
     logger.error('Shorting disabled, exiting')
     return 0
-  g.equity = account.equity
+  g.equity = equity(account)
+  g.cash = cash(account)
   g.positions = g.tclient.get_all_positions()
   return 1
 
 def set_trade_size():
   logger = logging.getLogger(__name__)
-  equity = g.tclient.get_account().equity
-  g.trade_size = equity * g.MAX_TRADE_SIZE
+  g.trade_size = g.equity * g.MAX_TRADE_SIZE
   logger.info('trade_size = %s' % g.trade_size)
   return

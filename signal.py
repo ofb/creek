@@ -110,9 +110,7 @@ by dividing free capital by the max position size, which is defined as
 total capital times the global parameter MAX_TRADE_SIZE and is set in
 trade.set_trade_size() at the beginning of the day.
 '''
-def available_trades():
-  cash = g.tclient.get_account().cash
-  return math.floor(cash / g.trade_size)
+def available_trades(): return math.floor(g.cash / g.trade_size)
 
 '''
 The following method compares utilization and missed trades to determine
@@ -147,11 +145,12 @@ async def main(clock):
   to_close = []
   to_open = {}
   for key, trade in g.trades.items():
+    trade.append_bar()
     if trade.status() == 'open':
       if trade.close_signal(bars): to_close.append(key)
     elif trade.status() == 'closed':
       o, d, l, s = trade.open_signal()
-      if o: to_open[key] = [trade.pearson(), d, l, s]
+      if o: to_open[key] = [abs(trade.pearson()), d, l, s]
   to_open_df = pd.DataFrame.from_dict(to_open, orient='index',
                columns=['pearson','dev','long','short'])
   to_open_df = sort_trades(to_open_df)
@@ -160,17 +159,19 @@ async def main(clock):
   await asyncio.gather(*(g.trades[k].try_close() for k in to_close),
     *(g.trades[k].try_open() for k in to_open_df[:n].index))
   
-  g.retarget['missed'].append(max(0,len(to_open_df) - n))
-  account = g.tclient.get_account()
-  g.retarget['util'].append(1 - account.cash / account.equity)
-  retarget(clock)
   # Give a moment for positions to update from the recent trades
   if time.time() - start < 55: time.sleep(2)
+  g.retarget['missed'].append(max(0,len(to_open_df) - n))
+  account = g.tclient.get_account()
+  g.equity = trade.equity(account)
+  g.cash = trade.cash(account)
+  g.retarget['util'].append(1 - g.cash / g.equity)
+  retarget(clock)
   # Get positions after trades have settled
-  g.equity = account.equity
   g.positions = g.tclient.get_all_positions() # List[Position]
-  if not set(positions_d.keys()) <= set(g.active_symbols.keys()):
-    logger.warning('There are unknown open positions.')
+  for p in g.positions:
+    if p.symbol not in g.active_symbols.keys():
+    logger.warning('There is an unknown position in %s' % p.symbol)
 
   
   if time.time() - start < 2: time.sleep(2)

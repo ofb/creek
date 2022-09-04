@@ -96,6 +96,9 @@ def load_trades():
                                   assets[row['symbol2']]],
                                   float(row['pearson']), 
                                   float(row['pearson_historical']))
+  for p in g.positions:
+    if p.symbol not in symbol_list:
+    logger.warning('There is an unknown position in %s' % p.symbol)
   asset_dict = {}
   for symbol in set(symbol_list):
     asset_dict[symbol] = assets[symbol]
@@ -110,8 +113,6 @@ def stock_wss():
 async def bar_data_handler(bar):
   logger = logging.getLogger(__name__)
   g.bars[bar.symbol].append(bar)
-  if bar.symbol == 'AIRC':
-    logger.info('bars received')
 
 def account_wss():
   trading_stream = TradingStream(g.key, g.secret_key, paper=g.is_paper)
