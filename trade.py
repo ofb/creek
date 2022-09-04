@@ -3,6 +3,9 @@ import pandas as pd
 import os
 import asyncio
 import glob
+from datetime import datetime as dt
+from datetime import timedelta as td
+import pytz as tz
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
@@ -103,24 +106,44 @@ class Trade:
     new_bars = (g.bars[self._symbols[0].symbol][-1],
                 g.bars[self._symbols[1].symbol][-1])
     time = max(new_bars[0].timestamp, new_bars[1].timestamp)
+    if (len(self._sigma_series) > 0) and (
+     (time.astimezone(tz.timezone('US/Eastern')) - 
+     self._sigma_series.index[-1].astimezone(tz.timezone('US/Eastern')))
+     < td(seconds=50)): return # Nothing new
     sigma = self._sigma(new_bars[0].vwap, new_bars[1].vwap)
     s = pd.Series({time,sigma})
     self._sigma_series = pd.concat([self._sigma_series,s])
 
-  def open_signal(self):
-  '''
-  Returns a 4-tuple with the
-  - pearson coefficent for the pair
-  - deviation as a fraction of the standard deviation
-  - the symbol to go long
-  - the symbol to go short
-  '''
-    logger = logging.getLogger(__name__)
-    if self._symbols[0].symbol == 'AIRC' and self._symbols[1].symbol == 'AVB':
-      logger.info('Opening AIRC-AVB')
-      dev = 3.4
-      return self._pearson, dev, 'AIRC', 'AVB'
-    else: return 0, 0, None, None
+  def open_signal(self, clock):
+    '''
+    Returns a 4-tuple with the
+    - True/False whether to open
+    - deviation as a fraction of the standard deviation
+    - the symbol to go long
+    - the symbol to go short
+    '''
+    if (len(self._sigma_series) == 0) or ((clock.now() - 
+     self._sigma_series.index[-1].astimezone(tz.timezone('US/Eastern')))
+     > td(minutes=1)): return 0, None, None, None
+    else:
+      sigma = self._sigma_series[-1]
+      if sigma > g.TO_OPEN_SIGNAL:
+        logger = logging.getLogger(__name__)
+        x = g.bars[self._symbols[0].symbol][-1].vwap
+        y = g.bars[self._symbols[1].symbol][-1].vwap
+        if y > self._mean(x):
+          return (1, sigma, self._symbols[0].symbol, 
+                            self._symbols[1].symbol)
+          logger.info('Sigma = %s, long %s short %s' % 
+                      sigma, self._symbols[0].symbol, 
+                             self._symbols[1].symbol)
+        else:
+          return (1, sigma, self._symbols[1].symbol, 
+                            self._symbols[0].symbol)
+          logger.info('Sigma = %s, long %s short %s' % 
+                      sigma, self._symbols[1].symbol, 
+                             self._symbols[0].symbol)
+      else: return 0, None, None, None
 
   def close_signal(self):
     return 0

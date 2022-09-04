@@ -149,7 +149,7 @@ async def main(clock):
     if trade.status() == 'open':
       if trade.close_signal(bars): to_close.append(key)
     elif trade.status() == 'closed':
-      o, d, l, s = trade.open_signal()
+      o, d, l, s = trade.open_signal(clock)
       if o: to_open[key] = [abs(trade.pearson()), d, l, s]
   to_open_df = pd.DataFrame.from_dict(to_open, orient='index',
                columns=['pearson','dev','long','short'])
