@@ -74,6 +74,7 @@ class Trade:
     if not self._symbols[0].shortable or not self._symbols[1].shortable:
       self._status = 'disabled'
     self._sigma_series = pd.Series(dtype=np.float64)
+    self._opened = None # To be set in pytz timezone US/Eastern
     # ...
     self._status = 'closed'
 
@@ -122,9 +123,7 @@ class Trade:
     - the symbol to go long
     - the symbol to go short
     '''
-    if (len(self._sigma_series) == 0) or ((clock.now() - 
-     self._sigma_series.index[-1].astimezone(tz.timezone('US/Eastern')))
-     > td(minutes=1)): return 0, None, None, None
+    if len(self._sigma_series) == 0: return 0, None, None, None
     else:
       sigma = self._sigma_series[-1]
       if sigma > g.TO_OPEN_SIGNAL:
@@ -134,24 +133,35 @@ class Trade:
         if y > self._mean(x):
           return (1, sigma, self._symbols[0].symbol, 
                             self._symbols[1].symbol)
-          logger.info('Sigma = %s, long %s short %s' % 
-                      sigma, self._symbols[0].symbol, 
-                             self._symbols[1].symbol)
+          logger.info('%s sigma = %s, long %s short %s' % 
+                      self._title, sigma, self._symbols[0].symbol, 
+                                          self._symbols[1].symbol)
         else:
           return (1, sigma, self._symbols[1].symbol, 
                             self._symbols[0].symbol)
-          logger.info('Sigma = %s, long %s short %s' % 
-                      sigma, self._symbols[1].symbol, 
-                             self._symbols[0].symbol)
+          logger.info('%s sigma = %s, long %s short %s' % 
+                      self._title, sigma, self._symbols[1].symbol, 
+                                          self._symbols[0].symbol)
       else: return 0, None, None, None
 
-  def close_signal(self):
-    return 0
+  def close_signal(self, clock):
+    logger = logging.getLogger(__name__)
+    if len(self._sigma_series) == 0:
+      logger.error('%s is open but has no sigma series' % self._title)
+      return 0
+    sigma = self._sigma_series[-1]
+    time = self._sigma_series.index[-1]
+    delta = clock.now() - self._opened
+    if sigma < 0.25: return 1
+    elif sigma < 0.5 and delta > td(weeks=1): return 1
+    elif sigma < 1 and delta > td(weeks=2): return 1
+    elif sigma < 2 and delta > td(weels=3): return 1
+    else: return 0
 
-  async def try_close(self):
+  async def try_close(self, latest_bar):
     pass
 
-  async def try_open(self):
+  async def try_open(self, latest_quote, latest_bar):
     '''
     Important To-Do:
     - Ensure bid-ask spread is a sufficiently small percentage of sigma.

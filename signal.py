@@ -6,7 +6,9 @@ import math
 import time
 import pytz as tz
 import pandas as pd
-import alpaca.trading.client as ac
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import StockLatestBarRequest
+from alpaca.data.requests import StockLatestQuoteRequest
 from . import trade
 from . import signal
 from . import config as g
@@ -147,7 +149,7 @@ async def main(clock):
   for key, trade in g.trades.items():
     trade.append_bar()
     if trade.status() == 'open':
-      if trade.close_signal(bars): to_close.append(key)
+      if trade.close_signal(clock): to_close.append(key)
     elif trade.status() == 'closed':
       o, d, l, s = trade.open_signal(clock)
       if o: to_open[key] = [abs(trade.pearson()), d, l, s]
@@ -156,8 +158,16 @@ async def main(clock):
   to_open_df = sort_trades(to_open_df)
   to_open_df = remove_concentration(to_open_df)
   n = available_trades()
-  await asyncio.gather(*(g.trades[k].try_close() for k in to_close),
-    *(g.trades[k].try_open() for k in to_open_df[:n].index))
+  symbols = list(set(to_open_df['long'][:n].to_list +
+                to_open_df['short'][:n].to_list + to_close))
+  quote_request = StockLatestQuoteRequest(symbol_or_symbols=symbols)
+  bar_request = StockLatestBarRequest(symbol_or_symbols=symbols)
+  latest_quote = g.client.get_stock_latest_quote(quote_request)
+  latest_bar = g.client.get_stock_latest_bar(bar_request)
+  await asyncio.gather(
+    *(g.trades[k].try_close(latest_bar) for k in to_close),
+    *(g.trades[k].try_open(latest_quote, latest_bar)
+      for k in to_open_df[:n].index))
   
   # Give a moment for positions to update from the recent trades
   if time.time() - start < 55: time.sleep(2)
