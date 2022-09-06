@@ -7,7 +7,7 @@ import time
 import pytz as tz
 import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockLatestBarRequest
+from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.requests import StockLatestQuoteRequest
 from . import trade
 from . import signal
@@ -161,14 +161,16 @@ async def main(clock):
   symbols = list(set(to_open_df['long'][:n].to_list +
                 to_open_df['short'][:n].to_list + to_close))
   quote_request = StockLatestQuoteRequest(symbol_or_symbols=symbols)
-  bar_request = StockLatestBarRequest(symbol_or_symbols=symbols)
+  trade_request = StockLatestTradeRequest(symbol_or_symbols=symbols)
   latest_quote = g.client.get_stock_latest_quote(quote_request)
-  latest_bar = g.client.get_stock_latest_bar(bar_request)
-  await asyncio.gather(
+  latest_trade = g.client.get_stock_latest_trade(trade_request)
+  hedge = await asyncio.gather(
     *(g.trades[k].try_close(latest_bar) for k in to_close),
-    *(g.trades[k].try_open(latest_quote, latest_bar)
+    *(g.trades[k].try_open(latest_quote, latest_trade)
       for k in to_open_df[:n].index))
-  
+  # Need to buy a fraction of an index for the remainder.
+  # Remember to add this index to active_symbols manually.
+
   # Give a moment for positions to update from the recent trades
   if time.time() - start < 55: time.sleep(2)
   g.retarget['missed'].append(max(0,len(to_open_df) - n))

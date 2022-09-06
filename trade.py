@@ -161,18 +161,36 @@ class Trade:
   async def try_close(self, latest_bar):
     pass
 
-  async def try_open(self, latest_quote, latest_bar):
+  async def try_open(self, latest_quote, latest_trade):
     '''
     Important To-Do:
     - Ensure bid-ask spread is a sufficiently small percentage of sigma.
     '''
-    pass
+    logger = logging.getLogger(__name__)
+    symbol1 = self._symbols[0].symbol
+    symbol2 = self._symbols[1].symbol
+    bid_ask = max(bid_ask(latest_quote, self._symbols))
+    stddev = self._stddev(latest_trade[self._symbols[0].symbol])
+    if stddev < 10 * bid_ask:
+      logger.info('Passing on %s as bid-ask spread = %s while stddev = %s' % (self._title, bid_ask, stddev))
+    sigma = self._sigma(latest_trade[self._symbols[0].symbol], 
+                        latest_trade[self._symbols[1].symbol])
+    if sigma < g.TO_OPEN_SIGNAL: return 0
+    
   
   # To initialize already-open trades
   def open_init(dict):
     # ...
     self._status = 'open'
     pass
+
+def bid_ask(latest_quote, symbols):
+  ba = []
+  assert len(symbols) == 2
+  for s in symbols:
+    ba.append(latest_quote[s.symbol].ask_price - 
+              latest_quote[s.symbol].bid_price)
+  return max(0,sum(ba)/2)
 
 def equity(account): return max(account.equity - g.EXCESS_CAPITAL,1)
 
