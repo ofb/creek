@@ -202,10 +202,10 @@ class Trade:
       to_short = 0
     if self._symbols[to_long].fractionable:
       short_cushion = stddev / g.SIGMA_CUSHION if to_short else abs(stddev_x) / g.SIGMA_CUSHION
-      short_limit = price[to_short] - min(bid_ask(price[to_short]),
+      short_limit = price[to_short] - min(bid_ask[to_short],
                                           short_cushion)
       short_request = LimitOrderRequest(
-                      symbol = self._symbols[to_short],
+                      symbol = self._symbols[to_short].symbol,
                       qty = math.floor((g.trade_size/2) / short_limit),
                       side = 'sell',
                       time_in_force = 'day',
@@ -231,6 +231,32 @@ class Trade:
         - shares_to_long * price[to_long]) < 0:
       logger.error('Long position is larger than short position')
       return 0
+    short_cushion = stddev / g.SIGMA_CUSHION if to_short else abs(stddev_x) / g.SIGMA_CUSHION
+    short_limit = price[to_short] - min(bid_ask[to_short],short_cushion)
+    long_cushion = stddev / g.SIGMA_CUSHION if to_long else abs(stddev_x) / g.SIGMA_CUSHION
+    long_limit = price[to_long] + min(bid_ask[to_long],long_cushion)
+    short_request = LimitOrderRequest(
+                      symbol = self._symbols[to_short].symbol,
+                      qty = math.floor((g.trade_size/2) / short_limit),
+                      side = 'sell',
+                      time_in_force = 'day',
+                      client_order_id = self._title,
+                      limit_price = short_limit
+                      )
+    long_request = LimitOrderRequest(
+                      symbol = self._symbols[to_long].symbol,
+                      qty = math.floor((g.trade_size/2) / long_limit),
+                      side = 'buy',
+                      time_in_force = 'day',
+                      client_order_id = self._title,
+                      limit_price = long_limit
+                      )
+    g.tclient.submit_order(short_request)
+    g.tclient.submit_order(long_request)
+    self._status = 'opening'
+    logger.info('Initiating %s, long %s, short %s' %
+                (self._title, self._symbols[to_long],
+                self._symbols[to_short]))
     return 0
   
   # To initialize already-open trades
