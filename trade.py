@@ -6,6 +6,8 @@ import glob
 from datetime import datetime as dt
 from datetime import timedelta as td
 import pytz as tz
+from fractions import Fraction
+import math
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
@@ -13,6 +15,7 @@ import tensorflow_probability as tfp
 tfd = tfp.distributions
 from tensorflow.python.framework import errors_impl as tf_errors
 import numpy as np
+from alpaca.trading.requests import LimitOrderRequest
 from . import config as g
 
 # Things we want for our trade class:
@@ -101,6 +104,13 @@ class Trade:
   def _sigma(self, x, y):
     return abs(y - self._mean(x)) / self._stddev(x)
 
+  def _stddev_x(self, x):
+    xpoints = np.array([[x]], [2 * x]], dtype='float32')
+    m = self._model(points)
+    ypoints = np.squeeze(m.mean().numpy)
+    ydelta = self._stddev(x)
+    return ( ydelta  / (ypoints[1] - ypoints[0]) ) * x 
+
   def append_bar(self):
     if (not g.bars[self._symbols[0].symbol] or
         not g.bars[self._symbols[1].symbol]): return
@@ -162,21 +172,66 @@ class Trade:
     pass
 
   async def try_open(self, latest_quote, latest_trade):
-    '''
-    Important To-Do:
-    - Ensure bid-ask spread is a sufficiently small percentage of sigma.
-    '''
     logger = logging.getLogger(__name__)
-    symbol1 = self._symbols[0].symbol
-    symbol2 = self._symbols[1].symbol
-    bid_ask = max(bid_ask(latest_quote, self._symbols))
-    stddev = self._stddev(latest_trade[self._symbols[0].symbol])
-    if stddev < 10 * bid_ask:
-      logger.info('Passing on %s as bid-ask spread = %s while stddev = %s' % (self._title, bid_ask, stddev))
-    sigma = self._sigma(latest_trade[self._symbols[0].symbol], 
-                        latest_trade[self._symbols[1].symbol])
+    price = (latest_trade[self._symbols[0].symbol].price,
+             latest_trade[self._symbols[1].symbol].price)
+    if price[0] > g.trade_size / 2
+      logger.info('Passing on %s as one share of %s costs %s, whereas the max trade size is %s' % (self._title, self._symbols[0].symbol, price[0], g.trade_size))
+      return 0
+    if price[1] > g.trade_size / 2:
+      logger.info('Passing on %s as one share of %s costs %s, whereas the max trade size is %s' % (self._title, self._symbols[1].symbol, price[1], g.trade_size))
+      return 0
+    sigma = self._sigma(price[0], price[1])
     if sigma < g.TO_OPEN_SIGNAL: return 0
-    
+    bid_ask = bid_ask(latest_quote, self._symbols)
+    stddev = self._stddev(price[0])
+    if stddev < 10 * bid_ask[0]:
+      logger.info('Passing on %s as bid-ask spread for %s = %s while stddev = %s' % (self._title, self._symbols[0].symbol, bid_ask[0], stddev))
+      return 0
+    stddev_x = self._stddev_x(price[0]) # signed float
+    if abs(stddev_x) < 10 * bid_ask[1]:
+      logger.info('Passing on %s as bid-ask spread for %s = %s while |stddev_x| = %s' % (self._title, self._symbols[1].symbol, bid_ask[1], abs(stddev_x)))
+      return 0
+
+    mean = self._mean(price[0])
+    if price[1] > mean:
+      to_long = 0
+      to_short = 1
+    else:
+      to_long = 1
+      to_short = 0
+    if self._symbols[to_long].fractionable:
+      short_cushion = stddev / g.SIGMA_CUSHION if to_short else abs(stddev_x) / g.SIGMA_CUSHION
+      short_limit = price[to_short] - min(bid_ask(price[to_short]),
+                                          short_cushion)
+      short_request = LimitOrderRequest(
+                      symbol = self._symbols[to_short],
+                      qty = math.floor((g.trade_size/2) / short_limit),
+                      side = 'sell',
+                      time_in_force = 'day',
+                      client_order_id = self._title,
+                      limit_price = short_limit
+                      )
+      g.tclient.submit_order(short_request)
+    if price[1] >= price[0]:
+      expensive = 1
+      cheap = 0
+    else:
+      expensive = 0
+      cheap = 1
+    mm = min_max(Fraction(price[cheap]/price[expensive]),
+                 math.floor((g.trade_size/2) / price[cheap]))
+    if cheap == to_short: # want denominator big; i.e. lower bound
+      shares_to_short = mm[0][1]
+      shares_to_long = mm[0][0]
+    else:  # want demoninator smaller; i.e. upper bound
+      shares_to_long = mm[1][1]
+      shares_to_short = mm[1][0]
+    if (shares_to_short * price[to_short] 
+        - shares_to_long * price[to_long]) < 0:
+      logger.error('Long position is larger than short position')
+      return 0
+    return 0
   
   # To initialize already-open trades
   def open_init(dict):
@@ -184,13 +239,28 @@ class Trade:
     self._status = 'open'
     pass
 
+# See https://github.com/python/cpython/blob/3.10/Lib/fractions.py
+def min_max(fraction, max_denominator):
+  p0, q0, p1, q1 = 0, 1, 1, 0
+  n, d = fraction.numerator, fraction.denominator
+  while True:
+    a = n//d
+    q2 = q0+a*q1
+    if q2 > max_denominator: break
+    p0, q0, p1, q1 = p1, q1, p0+a*p1, q2
+    n, d = d, n-a*d
+  k = (max_denominator-q0)//q1
+  bound1 = (p0+k*p1, q0+k*q1) # lower bound
+  bound2 = (p1, q1) # upper bound
+  return bound1, bound2
+
 def bid_ask(latest_quote, symbols):
   ba = []
   assert len(symbols) == 2
   for s in symbols:
     ba.append(latest_quote[s.symbol].ask_price - 
               latest_quote[s.symbol].bid_price)
-  return max(0,sum(ba)/2)
+  return ba[0], ba[1]
 
 def equity(account): return max(account.equity - g.EXCESS_CAPITAL,1)
 

@@ -36,3 +36,9 @@ EXCESS_CAPITAL is subtracted from absolute total capital to determine
 (usable) total capital. (Useful when needing to take money out.)
 '''
 EXCESS_CAPITAL = 0.0
+'''
+SIGMA_CUSHION determines how far off the last trade price to try to
+enter or exit a new position. The extra cushion is the smaller of the
+bid-ask spread or 1 sigma / SIGMA_CUSHION.
+'''
+SIGMA_CUSHION = 40
