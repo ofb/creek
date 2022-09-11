@@ -111,7 +111,6 @@ def stock_wss():
   wss_client.run()
 
 async def bar_data_handler(bar):
-  logger = logging.getLogger(__name__)
   g.bars[bar.symbol].append(bar)
 
 def account_wss():
@@ -119,8 +118,22 @@ def account_wss():
   trading_stream.subscribe_trade_updates(trading_stream_handler)
   trading_stream.run()
 
-async def trading_stream_handler(data):
-  logger.info(data)
+# update is class alpaca.trading.models TradeUpdate
+async def trading_stream_handler(update):
+  logger = logging.getLogger(__name__)
+  if update.order.client_order_id not in g.orders.keys():
+    logger.error('TradeUpdate for a trade not in g.orders:')
+    logger.error(update)
+  else:
+    if update.order.side == 'buy':
+      g.orders[update.order.client_order_id]['long'] = update.order
+      logger.info(update)
+    elif update.order.side == 'sell':
+      g.orders[update.order.client_order_id]['short'] = update.order
+      logger.info(update)
+    else:
+      logger.warning('TradeUpdate for a trade with unknown side')
+      logger.warning(update)
 
 def archive(closed_trades):
   logger = logging.getLogger(__name__)
