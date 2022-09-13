@@ -149,6 +149,7 @@ async def main(clock):
   for key, trade in g.trades.items():
     trade.append_bar()
     if trade.status() == 'open':
+      # need to add identification of `bail out' cases
       if trade.close_signal(clock): to_close.append(key)
     elif trade.status() == 'closed':
       o, d, l, s = trade.open_signal(clock)
@@ -165,8 +166,9 @@ async def main(clock):
   latest_quote = g.client.get_stock_latest_quote(quote_request)
   latest_trade = g.client.get_stock_latest_trade(trade_request)
   hedge = await asyncio.gather(
-    *(g.trades[k].try_close(latest_bar) for k in to_close),
-    *(g.trades[k].try_open(latest_quote, latest_trade)
+    *(g.trades[k].try_close(clock, latest_quote, latest_trade)
+      for k in to_close),
+    *(g.trades[k].try_open(clock, latest_quote, latest_trade)
       for k in to_open_df[:n].index))
   # Need to buy a fraction of an index for the remainder.
   # Remember to add this index to active_symbols manually.
