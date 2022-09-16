@@ -145,12 +145,13 @@ async def main(clock):
   logger.info('Entering main; len(AIRC) = %s' % len(g.bars['AIRC']))
   start = time.time()
   to_close = []
+  to_bail_out = []
   to_open = {}
   for key, trade in g.trades.items():
     trade.append_bar()
     if trade.status() == 'open':
-      # need to add identification of `bail out' cases
-      if trade.close_signal(clock): to_close.append(key)
+      if trade.bail_out_signal(clock): to_bail_out.append(key)
+      elif trade.close_signal(clock): to_close.append(key)
     elif trade.status() == 'closed':
       o, d, l, s = trade.open_signal(clock)
       if o: to_open[key] = [abs(trade.pearson()), d, l, s]
@@ -166,12 +167,41 @@ async def main(clock):
   latest_quote = g.client.get_stock_latest_quote(quote_request)
   latest_trade = g.client.get_stock_latest_trade(trade_request)
   hedge = await asyncio.gather(
+    *(g.trades[k].bail_out() for k in to_bail_out),
     *(g.trades[k].try_close(clock, latest_quote, latest_trade)
       for k in to_close),
     *(g.trades[k].try_open(clock, latest_quote, latest_trade)
       for k in to_open_df[:n].index))
   # Need to buy a fraction of an index for the remainder.
   # Remember to add this index to active_symbols manually.
+  hedge_notional = 0.0 # To go long (in dollars)
+  hedge_d = {} # To cover (negative fractional quantity)
+  closed_trades_by_hedge = {} # Indexed by hedging symbol
+  for h in hedge:
+    if h == 0: continue
+    if type(h) is float:
+      if h < 0: logger.error('Negative hedge passed without symbol')
+      else: hedge_notional = hedge_notional + h
+    if type(h) is tuple:
+      if h[1] > 0:
+        logger.error('Positive hedge passed with symbol')
+        continue
+      elif h[0] in hedge_d.keys(): hedge_d[h[0]] = hedge_d[h[0]] + h[1]
+      elif hedge_d[h[0]] = h[1]
+      if h[0] in closed_trades_by_hedge.keys():
+        closed_trades_by_hedge[h[0]].append(h[2])
+      else: closed_trades_by_hedge[h[0]] = [h[2]]
+  hedged = await asyncio.gather(trade.hedge(notional),
+    *(trade.hedge_close(symbol, qty, closed_trades_by_hedge)
+      for symbol, qty in hedge_d.items()))
+  hedged_price = 0.0
+  for h in hedged:
+    if type(h) is float:
+      hedged_price  = h
+      break
+  for k in to_open_df[:n].index:
+    if g.trades[k].status() == 'open':
+      g.trades[k].fill_hedge(hedged_price)
 
   # Give a moment for positions to update from the recent trades
   if time.time() - start < 55: time.sleep(2)
@@ -185,7 +215,7 @@ async def main(clock):
   g.positions = g.tclient.get_all_positions() # List[Position]
   for p in g.positions:
     if p.symbol not in g.active_symbols.keys():
-    logger.warning('There is an unknown position in %s' % p.symbol)
+      logger.warning('There is an unknown position in %s' % p.symbol)
 
   
   if time.time() - start < 2: time.sleep(2)

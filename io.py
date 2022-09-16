@@ -1,3 +1,4 @@
+import sys
 import logging
 import pandas as pd
 import asyncio
@@ -96,12 +97,21 @@ def load_trades():
                                   assets[row['symbol2']]],
                                   float(row['pearson']), 
                                   float(row['pearson_historical']))
+  symbol_list.extend(g.HEDGE_SYMBOL_LIST)
   for p in g.positions:
     if p.symbol not in symbol_list:
-    logger.warning('There is an unknown position in %s' % p.symbol)
+      logger.warning('There is an unknown position in %s' % p.symbol)
   asset_dict = {}
   for symbol in set(symbol_list):
     asset_dict[symbol] = assets[symbol]
+  for i in range(i):
+    if assets_dict[g.HEDGE_SYMBOLS_LIST[i]].fractionable):
+      g.HEDGE_SYMBOL = g.HEDGE_SYMBOLS_LIST[i]
+      logger.info('g.HEDGE_SYMBOL = %s', g.HEDGE_SYMBOL)
+      break
+    if i == len(g.HEDGE_SYMBOLS_LIST)-1:
+      logger.error('None of the symbols in g.HEDGE_SYMBOL_LIST are fractionable, exiting')
+      sys.exit(1)
   return asset_dict, trades
 
 def stock_wss():
@@ -126,10 +136,10 @@ async def trading_stream_handler(update):
     logger.error(update)
   else:
     if update.order.side == 'buy':
-      g.orders[update.order.client_order_id]['long'] = update.order
+      g.orders[update.order.client_order_id]['buy'] = update.order
       logger.info(update)
     elif update.order.side == 'sell':
-      g.orders[update.order.client_order_id]['short'] = update.order
+      g.orders[update.order.client_order_id]['sell'] = update.order
       logger.info(update)
     else:
       logger.warning('TradeUpdate for a trade with unknown side')

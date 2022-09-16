@@ -61,4 +61,9 @@ EXECUTION_ATTEMPTS = 10
 The symbol of the ETF used to hedge our positions.
 Must be fractionable.
 '''
-HEDGE_SYMBOL = 'VTI'
+HEDGE_SYMBOL = 'VXF'
+'''
+Other symbols to try if HEDGE_SYMBOL is not fractionable
+List taken from https://www.forbes.com/sites/baldwin/2018/08/02/best-etfs-for-trading-small-and-mid-cap/
+'''
+HEDGE_SYMBOL_LIST = ['VXF', 'SMMD', 'IJH', 'VO', 'SCHM', 'IJR', 'IWM', 'VB', 'VTI']
