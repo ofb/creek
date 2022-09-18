@@ -16,6 +16,7 @@ retarget = {'missed':[],'util':[]}
 cash = 0.0
 equity = 0.0
 positions = []
+burn_list = [] # This list contains those positions we bailed out of
 
 '''
 MAX_SYMBOL is the upper bound for the overall position in any one symbol

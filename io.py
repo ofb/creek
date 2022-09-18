@@ -1,9 +1,12 @@
 import sys
+import os
 import logging
 import pandas as pd
 import asyncio
 import glob
+import json
 from datetime import datetime as dt
+import pytz as tz
 from alpaca.trading.requests import GetAssetsRequest
 from alpaca.trading.enums import AssetClass
 from alpaca.data.live import StockDataStream
@@ -20,52 +23,21 @@ def get_assets():
   for a in assets:
     assets_dict[a.symbol] = a
   return assets_dict
+
 '''
 Saving/restoring trade objects
 '''
-def construct_symbol(id_,class_,exchange,symbol,status,tradable,
-                marginable,shortable,etb,fractionable):
-  d = {
-    'id': id_,
-    'class': class_,
-    'exchange': exchange,
-    'symbol': symbol,
-    'status': status,
-    'tradable': bool(eval(tradable)),
-    'marginable': bool(eval(marginable)),
-    'shortable': bool(eval(shortable)),
-    'easy_to_borrow': bool(eval(etb)),
-    'fractionable': bool(eval(fractionable)),
-  }
-  return Asset(**d)
-
-def read_trade(path):
-  open_trade_df = pd.read_csv(open_trade, index_col=0)
-  open_trade_df.set_index('index', inplace=True)
-  open_trade = open_trade_df.to_dict()[0]
-  symbol1 = construct_symbol(open_trade['symbol1_id'],
-                             open_trade['symbol1_class'],
-                             open_trade['symbol1_exchange'],
-                             open_trade['symbol1_symbol'],
-                             open_trade['symbol1_status'],
-                             open_trade['symbol1_tradable'],
-                             open_trade['symbol1_marginable'],
-                             open_trade['symbol1_shortable'],
-                             open_trade['symbol1_etb'],
-                             open_trade['symbol1_fractionable'])
-  symbol2 = construct_symbol(open_trade['symbol2_id'],
-                             open_trade['symbol2_class'],
-                             open_trade['symbol2_exchange'],
-                             open_trade['symbol2_symbol'],
-                             open_trade['symbol2_status'],
-                             open_trade['symbol2_tradable'],
-                             open_trade['symbol2_marginable'],
-                             open_trade['symbol2_shortable'],
-                             open_trade['symbol2_etb'],
-                             open_trade['symbol2_fractionable'])
-  t = trade.Trade([symbol1, symbol2], float(open_trade['pearson']),
-                  float(open_trade['pearson_historical']))
-  t.open_init(open_trade)
+def read_trade(path, assets):
+  with open(path, 'r') as f:
+    trade_dict = json.load(f)
+  t = trade.Trade([assets[trade_dict['symbols'][0]],
+      assets[trade_dict['symbols'][1]]], trade_dict['pearson'], 
+      trade_dict['pearson_historical'])
+  path = path.split('.')[0] + '.csv'
+  sigma_series = pd.read_csv(path, index_col=0,
+                             squeeze=True, parse_dates=True)
+  sigma_series.index = sigma_series.index.tz_convert(tz='US/Eastern')
+  t.open_init(trade_dict, sigma_series)
   return t
 
 def load_trades():
@@ -74,17 +46,14 @@ def load_trades():
   trades = {}
   assets = get_assets()
   pearson = pd.read_csv('%s/pearson.csv' % g.root, index_col=0)
-  open_trade_list = glob.glob('%s/open_trades/*.csv' % g.root)
+  open_trade_list = glob.glob('%s/open_trades/*.json' % g.root)
   logger.info('Loading open trades')
   for open_trade in open_trade_list:
     title = open_trade.split('/')[-1]
     title = title.split('.')[0]
     symbols = title.split('-')
     symbol_list.extend(symbols)
-    trades[title] = read_trade(open_trade)
-    if not trades[title].refresh_open([assets[symbols[0]],
-                                       assets[symbols[1]]]):
-      logger.error('%s is open but no longer tradable' % title)
+    trades[title] = read_trade(open_trade, assets)
   logger.info('Loading remaining tensorflow models')
   for index, row in pearson.iterrows():
     title = row['symbol1'] + '-' + row['symbol2']
@@ -145,18 +114,54 @@ async def trading_stream_handler(update):
       logger.warning('TradeUpdate for a trade with unknown side')
       logger.warning(update)
 
-def archive(closed_trades):
+def load_config():
+  logger = logging.getLogger(__name__)
+  path = g.root + 'config.json'
+  try:
+    with open(path, 'r') as f:
+      d = json.load(f)
+      g.TO_OPEN_SIGNAL = d['TO_OPEN_SIGNAL']
+      g.burn_list = d['burn_list']
+  except IOError as error:
+    logger.error(error)
+    logger.info('Could not load config; using defaults')
+    return
+  logger.info('Loaded config')
+  return
+
+def save():
+  logger = logging.getLogger(__name__)
+  logger.info('Saving TO_OPEN_SIGNAL + burn_list')
+  config_data = {'TO_OPEN_SIGNAL': g.TO_OPEN_SIGNAL, 'burn_list': g.burn_list}
+  path = g.root + 'config.json'
+  try:
+    with open(path, 'w') as f:
+      json.dump(config_data, f, indent=2)
+  except IOError as error: logger.error(error)
+  path = g.root + '/open_trades/*'
+  logger.info('Emptying %s/open_trades' % g.root)
+  files = glob.glob(path)
+  for f in files: os.remove(f)
+  logger.info('Saving open trades')
+  for title, trade in g.trades.items():
+    path = g.root + '/open_trades/' + title + '.json'
+    try:
+      with open(path, 'w') as f:
+        json.dump(trade.to_dict(), f, indent=2)
+    except IOError as error:
+      logger.error('%s save failed:' % title)
+      logger.error(error)
+    path = g.root + '/open_trades/' + title + '.csv'
+    trade.get_sigma_series().to_csv(path)
+  logger.info('Save complete')
+  return
+
+def archive():
   logger = logging.getLogger(__name__)
   logger.info('Archiving closed trades')
   pass
 
-def report(trades, closed_trades):
+def report():
   logger = logging.getLogger(__name__)
   logger.info('Generating today\'s report')
-  pass
-
-def save(trades):
-  logger = logging.getLogger(__name__)
-  logger.info('Saving open trades')
-  # Remember to save g.TO_OPEN_SIGNAL
   pass

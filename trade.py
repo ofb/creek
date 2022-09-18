@@ -85,21 +85,46 @@ class Trade:
                       {'side':None,'qty':0,'avg_entry_price':0.0}]
     self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 'side':'long',
                            'notional':0.0,'qty':0,'avg_entry_price':0.0}
-    # ...
     self._status = 'closed'
-
-  def refresh_open(self, symbol_list):
-    assert len(symbol_list) == 2
-    self._symbols = symbol_list
+  
+  # To initialize already-open trades
+  def open_init(dict, sigma_series):
+    logger = logging.getLogger(__name__)
+    self._status = dict['status']
+    self._opened = dt.fromisoformat(dict['opened']).astimezone(tz.timezone('US/Eastern'))
+    self._position = dict['position']
+    self._hedge_position = dict['hedge']
+    self._sigma_series = sigma_series
     if not self._symbols[0].tradable or not self._symbols[1].tradable:
       self._status = 'disabled'
-      return 0
-    else: return 1
+      logger.error('%s is open but not tradable' % self._title)
+    if not self._symbols[0].shortable or not self._symbols[1].shortable:
+      self._status = 'disabled'
+      logger.error('%s is open but not shortable' % self._title)
+    return
   
   def status(self): return self._status
   def pearson(self): return self._pearson
   def title(self): return self._title
-  
+  def get_position(self):
+    return {self._symbols[0].symbol:self._position[0],
+            self._symbols[1].symbol:self._position[1],
+            self._hedge_position['symbol']:self._hedge_position}
+  def get_sigma_series(self): return self._sigma_series
+
+  def to_dict(self):
+    d = {
+      'status': self._status,
+      'symbols': [self._symbols[0].symbol, self._symbols[1].symbol],
+      'pearson': self._pearson,
+      'pearson_historical': self._pearson_historical,
+      'title': self._title,
+      'opened': self._opened.isoformat(),
+      'position': self._position,
+      'hedge': self._hedge_position,
+    }
+    return d
+
   def fill_hedge(self, price):
     self._hedge_position['avg_entry_price'] = price
     self._hedge_position['qty'] = self._hedge_position['notional']/price
@@ -146,6 +171,7 @@ class Trade:
     - the symbol to go short
     '''
     if len(self._sigma_series) == 0: return 0, None, None, None
+    if self._title in g.burn_list: return 0, None, None, None
     else:
       sigma = self._sigma_series[-1]
       if sigma > g.TO_OPEN_SIGNAL:
@@ -184,11 +210,13 @@ class Trade:
     recent = self._sigma_series[-5:].to_list()
     if len(recent == 5) and sum(recent)/5 > 6:
       logger.info('Last 5 bars of %s have average sigma > 6, bailing out' % self._title)
+      g.burn_list.append(self._title)
       return 1
     if (clock.now() - self._opened) > td(days=7):
       recent = self._sigma_series[(clock.now() - td(days=7)):].to_list()
       if sum(recent)/max(len(recent),1) > 4:
         logger.info('Last week of bars of %s have average sigma > 4, bailing out' % self._title)
+        g.burn_list.append(self._title)
         return 1
     return 0
 
@@ -756,13 +784,6 @@ class Trade:
                       self._symbols[to_long].symbol,
                       g.orders[self._title]['sell'].status))
       return 0
-  
-  
-  # To initialize already-open trades
-  def open_init(dict):
-    # ...
-    self._status = 'open'
-    pass
 
 class ClosedTrade:
   def __init__(self, trade, closed, avg_exit_price, hedge_exit_price):
@@ -856,8 +877,27 @@ async def hedge_close(symbol, qty, closed_trades_by_hedge):
   else:
     logger.error('Market sell order %s for %s not filled with status %s' %
                  (g.orders[symbol]['sell'].id, symbol,
-                  g.orders[symbol]['buy'].status))
+                  g.orders[symbol]['sell'].status))
   return
+
+async def fix_positions(symbol, qty):
+  logger = logging.getLogger(__name__)
+  if symbol in g.active_symbols:
+    int_qty = round(qty)
+    if abs(int_qty - qty) < 0.05: qty = int_qty
+  if qty == 0 return
+  side = 'buy' if qty > 0 else 'sell'
+  request = MarketOrderRequest(symbol = symbol, qty = abs(qty),
+                               side = side, client_order_id = symbol,
+                               time_in_force = 'day')
+  g.orders[symbol] = {side: None}
+  await asyncio.sleep(2)
+  if g.orders[symbol][side].status == 'filled':
+    logger.info('Position in %s repaired' % symbol)
+  else:
+    logger.error('Market %s order %s for %s not filled with status %s' %
+                 (side, g.orders[symbol][side].id, symbol,
+                  g.orders[symbol][side].status))
 
 def equity(account):
   return max(float(account.equity) - g.EXCESS_CAPITAL,1)

@@ -24,6 +24,7 @@ AVB = trading_client.get_asset('AVB')
 AIRC = trading_client.get_asset('AIRC')
 t = trade.Trade([AVB, AIRC], 0.9, 0.94)
 
+io.load_config()
 # Also sets g.cash, g.equity, g.positions
 if not trade.account_ok(): sys.exit(1)
 trade.set_trade_size()
@@ -44,6 +45,6 @@ while not first_bar:
     if g.bars[symbol]: first_bar = True
 while ((clock.next_close - clock.now()) >= td(seconds=58)):
   asyncio.run(signal.main(clock))
-io.archive(g.closed_trades)
-io.report(g.trades, g.closed_trades)
-io.save(g.trades)
+io.save()
+io.archive()
+io.report()
