@@ -1,10 +1,12 @@
 from alpaca.trading.client import TradingClient
+from alpaca.data.historical import StockHistoricalDataClient
 
 root = '/mnt/disks/creek-1/creek'
 key = 'PKPJP2B4UC1EQM94TAGE'
 secret_key = 'xMpqEXBAOxutI4plWrPri0nLTUvisItzDAUZQz4J'
 is_paper = True
 tclient = TradingClient(key, secret_key)
+hclient = StockHistoricalDataClient(api_key=key, secret_key=secret_key)
 
 active_symbols = {} # 'SYMBOL': <Symbol_Object>
 trades = {} # 'SYMBOL1-SYMBOL2': <Trade_Object>

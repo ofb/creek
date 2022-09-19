@@ -75,12 +75,12 @@ def load_trades():
   asset_dict = {}
   for symbol in set(symbol_list):
     asset_dict[symbol] = assets[symbol]
-  for i in range(i):
-    if assets_dict[g.HEDGE_SYMBOLS_LIST[i]].fractionable):
-      g.HEDGE_SYMBOL = g.HEDGE_SYMBOLS_LIST[i]
-      logger.info('g.HEDGE_SYMBOL = %s', g.HEDGE_SYMBOL)
+  for i in range(len(g.HEDGE_SYMBOL_LIST)):
+    if assets[g.HEDGE_SYMBOL_LIST[i]].fractionable:
+      g.HEDGE_SYMBOL = g.HEDGE_SYMBOL_LIST[i]
+      logger.info('HEDGE_SYMBOL = %s', g.HEDGE_SYMBOL)
       break
-    if i == len(g.HEDGE_SYMBOLS_LIST)-1:
+    if i == len(g.HEDGE_SYMBOL_LIST)-1:
       logger.error('None of the symbols in g.HEDGE_SYMBOL_LIST are fractionable, exiting')
       sys.exit(1)
   return asset_dict, trades
@@ -102,15 +102,16 @@ def account_wss():
 # update is class alpaca.trading.models TradeUpdate
 async def trading_stream_handler(update):
   logger = logging.getLogger(__name__)
-  if update.order.client_order_id not in g.orders.keys():
+  coi = update.order.client_order_id.split('_')[0]
+  if coi not in g.orders.keys():
     logger.error('TradeUpdate for a trade not in g.orders:')
     logger.error(update)
   else:
     if update.order.side == 'buy':
-      g.orders[update.order.client_order_id]['buy'] = update.order
+      g.orders[coi]['buy'] = update.order
       logger.info(update)
     elif update.order.side == 'sell':
-      g.orders[update.order.client_order_id]['sell'] = update.order
+      g.orders[coi]['sell'] = update.order
       logger.info(update)
     else:
       logger.warning('TradeUpdate for a trade with unknown side')

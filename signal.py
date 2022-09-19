@@ -6,7 +6,6 @@ import math
 import time
 import pytz as tz
 import pandas as pd
-from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.requests import StockLatestQuoteRequest
 from . import trade
@@ -52,7 +51,6 @@ class Clock():
       time.sleep(delta.seconds)
     self.refresh()
 
-
 '''
 Compare open positions to actual positions and return the difference
 '''
@@ -87,8 +85,8 @@ by their pearson coefficients. Some, however, will materially exceed the
 threshold, and those should be sorted by their deviation.
 '''
 def sort_trades(to_open):
-  to_open_outliers = to_open[to_open_df['dev'] > 1.1 * g.TO_OPEN_SIGNAL]
-  to_open_bulk = to_open[to_open_df['dev'] <= 1.1 * g.TO_OPEN_SIGNAL]
+  to_open_outliers = to_open[to_open['dev'] > 1.1 * g.TO_OPEN_SIGNAL]
+  to_open_bulk = to_open[to_open['dev'] <= 1.1 * g.TO_OPEN_SIGNAL]
   to_open_outliers.sort_values(by='dev',ascending=False,inplace=True)
   to_open_bulk.sort_values(by='pearson',ascending=False,inplace=True)
   return pd.concat([to_open_outliers,to_open_bulk])
@@ -125,12 +123,12 @@ def remove_concentration(to_open):
     net = l-s
     if net > longs:
       # diff = net - longs
-      mask = ((df['long']!=key) |
+      mask = ((to_open['long']!=key) |
               (to_open.groupby('long').cumcount() <= l - (net - longs)))
       to_open = to_open[mask]
     elif net < -shorts:
       # diff = -(net - (-shorts)) = -net - shorts
-      mask = ((df['short']!=key) |
+      mask = ((to_open['short']!=key) |
               (to_open.groupby('short').cumcount() <= s -(-net-shorts)))
       to_open = to_open[mask]
   return to_open
@@ -169,6 +167,28 @@ def retarget(clock):
       g.retarget['util'].clear()
   return
 
+def split_up(to_open):
+  splits = [0]
+  longs = []
+  shorts = []
+  counter = 0
+  for index, row in to_open.iterrows():
+    if row['long'] in shorts:
+      splits.append(counter)
+      longs.clear()
+      shorts.clear()
+      continue
+    elif row['short'] in longs:
+      splits.append(counter)
+      longs.clear()
+      shorts.clear()
+      continue
+    else:
+      longs.append(row['long'])
+      shorts.append(row['short'])
+    counter = counter + 1
+  return splits
+
 async def main(clock):
   logger = logging.getLogger(__name__)
   logger.info('Entering main; len(AIRC) = %s' % len(g.bars['AIRC']))
@@ -176,51 +196,64 @@ async def main(clock):
   to_close = []
   to_bail_out = []
   to_open = {}
-  for key, trade in g.trades.items():
-    trade.append_bar()
-    if trade.status() == 'open':
-      if trade.bail_out_signal(clock): to_bail_out.append(key)
-      elif trade.close_signal(clock): to_close.append(key)
-    elif trade.status() == 'closed':
-      o, d, l, s = trade.open_signal(clock)
-      if o: to_open[key] = [abs(trade.pearson()), d, l, s]
+  for key, t in g.trades.items():
+    t.append_bar()
+    if t.status() == 'open':
+      if t.bail_out_signal(clock): to_bail_out.append(key)
+      elif t.close_signal(clock): to_close.append(key)
+    elif t.status() == 'closed':
+      o, d, l, s = t.open_signal(clock)
+      if o: to_open[key] = [abs(t.pearson()), d, l, s]
   to_open_df = pd.DataFrame.from_dict(to_open, orient='index',
                columns=['pearson','dev','long','short'])
   to_open_df = sort_trades(to_open_df)
   to_open_df = remove_concentration(to_open_df)
   n = available_trades()
-  symbols = list(set(to_open_df['long'][:n].to_list +
-                to_open_df['short'][:n].to_list + to_close))
+  symbols = list(set(to_open_df['long'][:n].to_list() +
+                 to_open_df['short'][:n].to_list() + to_close))
   quote_request = StockLatestQuoteRequest(symbol_or_symbols=symbols)
   trade_request = StockLatestTradeRequest(symbol_or_symbols=symbols)
-  latest_quote = g.client.get_stock_latest_quote(quote_request)
-  latest_trade = g.client.get_stock_latest_trade(trade_request)
+  latest_quote = g.hclient.get_stock_latest_quote(quote_request)
+  latest_trade = g.hclient.get_stock_latest_trade(trade_request)
   hedge = await asyncio.gather(
     *(g.trades[k].bail_out() for k in to_bail_out),
     *(g.trades[k].try_close(clock, latest_quote, latest_trade)
-      for k in to_close),
-    *(g.trades[k].try_open(clock, latest_quote, latest_trade)
-      for k in to_open_df[:n].index))
+      for k in to_close))
+  hedge_open = []
+  splits = split_up(to_open_df)
+  for i in range(len(splits)):
+    if i < len(splits)-1:
+      h = await asyncio.gather(
+        *(g.trades[k].try_open(clock, latest_quote, latest_trade)
+          for k in to_open_df[splits[i]:splits[i+1]].index))
+    else:
+      h = await asyncio.gather(
+        *(g.trades[k].try_open(clock, latest_quote, latest_trade)
+          for k in to_open_df[splits[i]:n].index))
+    hedge_open.extend(list(h))
+    cancel_response = g.tclient.cancel_orders()
+    if len(cancel_response) > 0:
+      logger.info('There were canceled orders with the following HTTP statuses')
+      for s in cancel_response:
+        logger.info(s)
+  
   # Need to buy a fraction of an index for the remainder.
   # Remember to add this index to active_symbols manually.
-  hedge_notional = 0.0 # To go long (in dollars)
+  hedge_notional = sum(hedge_open) # To go long (in dollars)
   hedge_d = {} # To cover (negative fractional quantity)
   closed_trades_by_hedge = {} # Indexed by hedging symbol
   for h in hedge:
     if h == 0: continue
-    if type(h) is float:
-      if h < 0: logger.error('Negative hedge passed without symbol')
-      else: hedge_notional = hedge_notional + h
     if type(h) is tuple:
       if h[1] > 0:
         logger.error('Positive hedge passed with symbol')
         continue
       elif h[0] in hedge_d.keys(): hedge_d[h[0]] = hedge_d[h[0]] + h[1]
-      elif hedge_d[h[0]] = h[1]
+      else: hedge_d[h[0]] = h[1]
       if h[0] in closed_trades_by_hedge.keys():
         closed_trades_by_hedge[h[0]].append(h[2])
       else: closed_trades_by_hedge[h[0]] = [h[2]]
-  hedged = await asyncio.gather(trade.hedge(notional),
+  hedged = await asyncio.gather(trade.hedge(hedge_notional),
     *(trade.hedge_close(symbol, qty, closed_trades_by_hedge)
       for symbol, qty in hedge_d.items()))
   hedged_price = 0.0
