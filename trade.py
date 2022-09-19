@@ -110,7 +110,9 @@ class Trade:
     return {self._symbols[0].symbol:self._position[0],
             self._symbols[1].symbol:self._position[1],
             self._hedge_position['symbol']:self._hedge_position}
-  def get_sigma_series(self): return self._sigma_series
+  def get_sigma_series(self):
+    if self._status = 'open': return self._sigma_series[self._opened:]
+    else: return self._sigma_series
 
   def to_dict(self):
     d = {
@@ -830,7 +832,8 @@ class ClosedTrade:
   
   def closed(self): return self._closed
   def title(self): return self._title
-  def get_sigma_series(self): return self._sigma_series
+  def get_sigma_series(self):
+    return self._sigma_series[self._opened:self._closed]
   def get_pl(): return self._pl
   def to_dict(self):
     d = {
