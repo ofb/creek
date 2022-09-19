@@ -248,7 +248,7 @@ async def main(clock):
   excess_positions = trade.resolve_positions()
   await asyncio.gather(*(trade.fix_position(s, -q)
                          for s, q in excess_positions.items()))
-  
+  logger.info('signal.main() finished after %s seconds' % (time.time() - start))
   if time.time() - start < 2: time.sleep(2)
   now = clock.now()
   if ((time.time() - start) > 60) and ((clock.next_close

@@ -1,8 +1,8 @@
 from alpaca.trading.client import TradingClient
 
 root = '/mnt/disks/creek-1/creek'
-key = 'PK52PMRHMCY15OZGMZLW'
-secret_key = 'F8270IxVZS3hXdghv7ChIyQUalFRIZZxYYqMKfUh'
+key = 'PKPJP2B4UC1EQM94TAGE'
+secret_key = 'xMpqEXBAOxutI4plWrPri0nLTUvisItzDAUZQz4J'
 is_paper = True
 tclient = TradingClient(key, secret_key)
 

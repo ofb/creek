@@ -12,6 +12,8 @@ from alpaca.trading.enums import AssetClass
 from alpaca.data.live import StockDataStream
 from alpaca.trading.stream import TradingStream
 from alpaca.trading.models import Asset
+import matplotlib.pyplot as plt
+import pandas as pd
 from . import config as g
 from . import trade
 from . import signal
@@ -131,6 +133,7 @@ def load_config():
 
 def save():
   logger = logging.getLogger(__name__)
+  plt.style.use('seaborn')
   logger.info('Saving TO_OPEN_SIGNAL + burn_list')
   config_data = {'TO_OPEN_SIGNAL': g.TO_OPEN_SIGNAL, 'burn_list': g.burn_list}
   path = g.root + 'config.json'
@@ -152,16 +155,47 @@ def save():
       logger.error('%s save failed:' % title)
       logger.error(error)
     path = g.root + '/open_trades/' + title + '.csv'
-    trade.get_sigma_series().to_csv(path)
+    s = trade.get_sigma_series()
+    s.to_csv(path)
+    path = g.root + '/open_trades/' + title + '.png'
+    plt.clf()
+    fig = s.plot(kind='line',title=trade.title(),ylabel='sigma',rot=90)
+    fig = fig.get_figure()
+    fig.savefig(path, bbox_inches='tight', dpi=300)
+    plt.close()
   logger.info('Save complete')
   return
 
-def archive():
+def report(equity):
   logger = logging.getLogger(__name__)
+  plt.style.use('seaborn')
   logger.info('Archiving closed trades')
-  pass
-
-def report():
-  logger = logging.getLogger(__name__)
-  logger.info('Generating today\'s report')
-  pass
+  base_path = os.path.join(g.root, 'closed_trades', dt.now().strftime('%y-%m-%d'))
+  pl = 0.0
+  os.mkdir(base_path)
+  for trade in g.closed_trades:
+    pl = pl + trade.get_pl()
+    filename = trade.closed().strftime('%H-%M-') + trade.title()
+    path = os.path.join(base_path, filename + '.json')
+    try:
+      with open(path, 'w') as f:
+        json.dump(trade.to_dict(), f, indent=2)
+    except IOError as error:
+      logger.error('%s save failed:' % trade.title())
+      logger.error(error)
+    s = trade.get_sigma_series()
+    plt.clf()
+    path = os.path.join(base_path, filename + '.png')
+    fig = s.plot(kind='line',title=trade.title(),ylabel='sigma',rot=90)
+    fig = fig.get_figure()
+    fig.savefig(path, bbox_inches='tight', dpi=300)
+    plt.close()
+  path = os.path.join(g.root, 'closed_trades', dt.now().strftime('%y-%m-%d') + '.json')
+  r = pl / equity
+  try:
+    with open(path, 'w') as f:
+      json.dump({'profit-loss': pl, 'return': r}, f, indent=2)
+  except IOError as error:
+    logger.error('Report save failed:')
+    logger.error(error)
+  return

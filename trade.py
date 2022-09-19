@@ -799,11 +799,53 @@ class ClosedTrade:
     self._position[0]['avg_exit_price'] = avg_exit_price[0]
     self._position[1]['avg_exit_price'] = avg_exit_price[1]
     self._hedge_position['avg_exit_price'] = 0.0
+    for i in range(2):
+      j = 1 if self._position[i]['side'] == 'long' else -1
+      self._position[i]['profit-loss'] = j * ((
+        self._position[i]['avg_exit_price'] -
+        self._position[i]['avg_entry_price']) *
+        self._position[i]['qty'])
+    self._pl = 0.0
+    self._percent = 0.0
 
   def set_hedge_exit_price(self, price):
     self._hedge_position['avg_exit_price'] = price
-
-
+    
+    j = 1 if self._hedge_position['side'] == 'long' else -1
+    self._hedge_position['profit-loss'] = j * ((
+      self._hedge_position['avg_exit_price'] -
+      self._hedge_position['avg_entry_price']) *
+      self._hedge_position['qty'])
+    self._pl = (self._position[0]['profit-loss']
+                + self._position[1]['profit-loss']
+                + self._hedge_position['profit-loss'])
+    self._percent = self._pl / (
+      self._hedge_position['avg_entry_price'] * 
+      self._hedge_position['qty'] +
+      self._position[0]['avg_entry_price'] *
+      self._position[0]['qty'] +
+      self._position[1]['avg_entry_price'] *
+      self._position[1]['qty'])
+    return
+  
+  def closed(self): return self._closed
+  def title(self): return self._title
+  def get_sigma_series(self): return self._sigma_series
+  def get_pl(): return self._pl
+  def to_dict(self):
+    d = {
+      'title': self._title,
+      'profit-loss': self._pl,
+      'return': self._percent,
+      'opened': self._opened.isoformat(),
+      'closed': self._closed.isoformat(),
+      'position': self._position,
+      'hedge': self._hedge_position,
+      'pearson': self._pearson,
+      'pearson_historical': self._pearson_historical,
+      'status': self._status,
+      'symbols': [self._symbols[0].symbol, self._symbols[1].symbol],
+    }
 def get_latest_trade(symbol_or_symbols):
   trade_request = StockLatestTradeRequest(
                   symbol_or_symbols=symbol_or_symbols)

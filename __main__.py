@@ -27,6 +27,7 @@ t = trade.Trade([AVB, AIRC], 0.9, 0.94)
 io.load_config()
 # Also sets g.cash, g.equity, g.positions
 if not trade.account_ok(): sys.exit(1)
+initial_equity = g.equity
 trade.set_trade_size()
 g.active_symbols, g.trades = io.load_trades()
 for symbol in g.active_symbols.keys():
@@ -46,5 +47,4 @@ while not first_bar:
 while ((clock.next_close - clock.now()) >= td(seconds=58)):
   asyncio.run(signal.main(clock))
 io.save()
-io.archive()
-io.report()
+io.report(initial_equity)
