@@ -9,6 +9,7 @@ from datetime import timedelta as td
 import pytz as tz
 from fractions import Fraction
 import math
+import json
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import tensorflow.compat.v2 as tf
 tf.enable_v2_behavior()
@@ -935,6 +936,19 @@ def get_latest_trade(symbol_or_symbols):
   trade_request = StockLatestTradeRequest(
                   symbol_or_symbols=symbol_or_symbols)
   return g.hclient.get_stock_latest_trade(trade_request)
+
+def APIError_code(e):
+  try:
+    c = e.code
+    return c
+  except TypeError as te:
+    if type(e._error) is str:
+      d = json.loads(e._error)
+      return d['code']
+    else:
+      logger = logging.getLogger(__name__)
+      logger.error('Cannot find APIError code')
+      sys.exit(1)
 
 # See https://github.com/python/cpython/blob/3.10/Lib/fractions.py
 def min_max(fraction, max_denominator):

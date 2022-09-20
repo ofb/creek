@@ -167,28 +167,6 @@ def retarget(clock):
       g.retarget['util'].clear()
   return
 
-def split_up(to_open):
-  splits = [0]
-  longs = []
-  shorts = []
-  counter = 0
-  for index, row in to_open.iterrows():
-    if row['long'] in shorts:
-      splits.append(counter)
-      longs.clear()
-      shorts.clear()
-      continue
-    elif row['short'] in longs:
-      splits.append(counter)
-      longs.clear()
-      shorts.clear()
-      continue
-    else:
-      longs.append(row['long'])
-      shorts.append(row['short'])
-    counter = counter + 1
-  return splits
-
 async def main(clock):
   logger = logging.getLogger(__name__)
   logger.info('Entering main; len(AIRC) = %s' % len(g.bars['AIRC']))
@@ -217,33 +195,20 @@ async def main(clock):
   latest_trade = g.hclient.get_stock_latest_trade(trade_request)
   hedge = await asyncio.gather(
     *(g.trades[k].bail_out() for k in to_bail_out),
-    *(g.trades[k].try_close(clock, latest_quote, latest_trade)
-      for k in to_close))
-  hedge_open = []
-  splits = split_up(to_open_df)
-  for i in range(len(splits)):
-    if i < len(splits)-1:
-      h = await asyncio.gather(
-        *(g.trades[k].try_open(clock, latest_quote, latest_trade)
-          for k in to_open_df[splits[i]:splits[i+1]].index))
-    else:
-      h = await asyncio.gather(
-        *(g.trades[k].try_open(clock, latest_quote, latest_trade)
-          for k in to_open_df[splits[i]:n].index))
-    hedge_open.extend(list(h))
-    cancel_response = g.tclient.cancel_orders()
-    if len(cancel_response) > 0:
-      logger.info('There were canceled orders with the following HTTP statuses')
-      for s in cancel_response:
-        logger.info(s)
-  
+    *(g.trades[k].try_close(clock, latest_quote, latest_trade,
+      for k in to_close),
+    *(g.trades[k].try_open(clock, latest_quote, latest_trade)
+      for k in to_open_df[:n].index))
   # Need to buy a fraction of an index for the remainder.
   # Remember to add this index to active_symbols manually.
-  hedge_notional = sum(hedge_open) # To go long (in dollars)
+  hedge_notional = 0.0 # To go long (in dollars)
   hedge_d = {} # To cover (negative fractional quantity)
   closed_trades_by_hedge = {} # Indexed by hedging symbol
   for h in hedge:
     if h == 0: continue
+    if type(h) is float:
+       if h < 0: logger.error('Negative hedge passed without symbol')
+       else: hedge_notional = hedge_notional + h
     if type(h) is tuple:
       if h[1] > 0:
         logger.error('Positive hedge passed with symbol')
