@@ -907,7 +907,7 @@ async def try_submit(request):
     except APIError as e:
       if e.status_code == 403:
         logger.warn(e)
-        await async.sleep(1)
+        await asyncio.sleep(1)
         continue
       else:
         logger.error('APIError encountered during try_submit')
