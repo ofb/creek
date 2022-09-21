@@ -24,14 +24,6 @@ from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.common.exceptions import APIError
 from . import config as g
 
-# Things we want for our trade class:
-# have a status
-# be able to load and save itself
-# have a hedge symbol
-# record prices
-# contain tensorflow model information
-# record minute bars for as long as it's open
-
 class Trade:
   """
   Trade class.
@@ -333,13 +325,9 @@ class Trade:
 #            updated_short_request = ReplaceOrderRequest(
 #                                    limit_price=new_short_limit,
 #                                    client_order_id=stamp(self._title))
-#            try:
-#              short_order = g.tclient.replace_order_by_id(
-#                order_id=short_order.id,
-#                order_data=updated_short_request)
-#            except APIError as error:
-#              logger.error('There was an error when replacing order %s' % short_order.id)
-#              logger.error(error)
+#            order_try = try_replace(short_order.id,
+#                                    updated_short_request)
+#            short_order = order_try if order_try is not None else short_order
 #            short_limit = new_short_limit
 #        elif g.orders[self._title]['buy'].status == 'filled': break
 #        await asyncio.sleep(2)
@@ -380,8 +368,7 @@ class Trade:
 #        qty_covered = float(g.orders[self._title]['buy'].filled_qty)
 #        notional_covered = (
 #          qty_covered * float(g.orders[self._title]['buy'].filled_avg_price))
-#        cancel_response = g.tclient.cancel_order_by_id(short_order.id)
-#        logger.info(cancel_response)
+#        try_cancel(short_order.id)
 #        if qty_covered == 0: return 0
 #        else:
 #          # In this case our P/L calculations will be off since we will
@@ -446,13 +433,8 @@ class Trade:
           updated_long_request = ReplaceOrderRequest(
                                   limit_price=new_long_limit,
                                   client_order_id = stamp(self._title))
-          try:
-            long_order = g.tclient.replace_order_by_id(
-                order_id=long_order.id,
-                order_data=updated_long_request)
-          except APIError as error:
-            logger.error('There was an error when replacing order %s' % long_order.id)
-            logger.error(error)
+          order_try = try_replace(long_order.id, updated_long_request)
+          long_order = order_try if order_try is not None else long_order
           long_limit = new_long_limit
       if g.orders[self._title]['buy'].status != 'filled':
         latest_trade = get_latest_trade(self._symbols[_short].symbol)
@@ -467,13 +449,9 @@ class Trade:
           updated_short_request = ReplaceOrderRequest(
                                   limit_price=new_short_limit,
                                   client_order_id = stamp(self._title))
-          try:
-            short_order = g.tclient.replace_order_by_id(
-                order_id=short_order.id,
-                order_data=updated_short_request)
-          except APIError as error:
-            logger.error('There was an error when replacing order %s' % short_order.id)
-            logger.error(error)
+          order_try = try_replace(short_order.id,
+                                  updated_short_request)
+          short_order = order_try if order_try is not None else short_order
           short_limit = new_short_limit
       await asyncio.sleep(2)
     if (g.orders[self._title]['buy'].status == 'filled' and
@@ -494,10 +472,8 @@ class Trade:
       short_avg_price = float(g.orders[self._title]['buy'].filled_avg_price)
       long_qty_covered = int(g.orders[self._title]['sell'].filled_qty)
       long_avg_price = float(g.orders[self._title]['sell'].filled_avg_price)
-      cancel_response = g.tclient.cancel_order_by_id(long_order.id)
-      logger.info(cancel_response)
-      cancel_response = g.tclient.cancel_order_by_id(short_order.id)
-      logger.info(cancel_response)
+      try_cancel(long_order.id)
+      try_cancel(short_order.id)
       short_to_cover = self._position[_short]['qty'] - short_qty_covered
       long_to_cover = self._position[_long]['qty'] - long_qty_covered
       short_request = MarketOrderRequest(
@@ -628,13 +604,9 @@ class Trade:
 #                                  limit_price=new_short_limit,
 #                                  client_order_id = stamp(self._title))
 #            logger.info('Replacing short request for %s with limit price %s' % (self._symbols[to_short].symbol, new_short_limit))
-#            try:
-#              short_order = g.tclient.replace_order_by_id(
-#                order_id=short_order.id,
-#                order_data=updated_short_request)
-#            except APIError as error:
-#              logger.error('There was an error when replacing order %s' % short_order.id)
-#              logger.error(error)
+#.           order_try = try_replace(short_order.id,
+#                                    updated_short_request)
+#            short_order = order_try if order_try is not None else short_order
 #            short_limit = new_short_limit
 #        elif g.orders[self._title]['sell'].status == 'filled': break
 #        await asyncio.sleep(2)
@@ -674,8 +646,7 @@ class Trade:
 #                       (self._title, g.EXECUTION_ATTEMPTS))
 #        self._status = 'closed'
 #        short_qty_filled = int(g.orders[self._title]['sell'].filled_qty)
-#        cancel_response = g.tclient.cancel_order_by_id(short_order.id)
-#        logger.info(cancel_response)
+#        try_cancel(short_order.id)
 #        if short_qty_filled == 0: return 0
 #        cover_short_request = MarketOrderRequest(
 #                              symbol = self._symbols[to_short].symbol,
@@ -771,13 +742,9 @@ class Trade:
                                   limit_price=new_long_limit,
                                   client_order_id = stamp(self._title))
           logger.info('Updating limit price for %s to be %s' % (self._symbols[to_long].symbol, new_long_limit))
-          try:
-            long_order = g.tclient.replace_order_by_id(
-                order_id=long_order.id,
-                order_data=updated_long_request)
-          except APIError as error:
-            logger.error('There was an error when replacing order %s' % long_order.id)
-            logger.error(error)
+          order_try = try_replace(long_order.id,
+                                  updated_long_request)
+          long_order = order_try if order_try is not None else long_order
           long_limit = new_long_limit
       if g.orders[self._title]['sell'].status != 'filled':
         latest_trade = get_latest_trade(self._symbols[to_short].symbol)
@@ -795,13 +762,9 @@ class Trade:
                                   limit_price=new_short_limit,
                                   client_order_id = stamp(self._title))
           logger.info('Updating limit price for %s to be %s' % (self._symbols[to_short].symbol, new_short_limit))
-          try:
-            short_order = g.tclient.replace_order_by_id(
-                order_id=short_order.id,
-                order_data=updated_short_request)
-          except APIError as error:
-            logger.error('There was an error when replacing order %s' % short_order.id)
-            logger.error(error)
+          order_try = try_replace(short_order.id,
+                                  updated_short_request)
+          short_order = order_try if order_try is not None else short_order
           short_limit = new_short_limit
       await asyncio.sleep(2)
     if (g.orders[self._title]['buy'].status == 'filled' and
@@ -836,10 +799,8 @@ class Trade:
       long_qty_filled = int(g.orders[self._title]['buy'].filled_qty)
       short_qty_filled = int(g.orders[self._title]['sell'].filled_qty)
       logger.info('Filled qty long = %s, short = %s' % (long_qty_filled, short_qty_filled))
-      cancel_response = g.tclient.cancel_order_by_id(long_order.id)
-      logger.info(cancel_response)
-      cancel_response = g.tclient.cancel_order_by_id(short_order.id)
-      logger.info(cancel_response)
+      try_cancel(long_order.id)
+      try_cancel(short_order.id)
       if (short_qty_filled == 0 and long_qty_filled == 0): return 0
       if long_qty_filled > 0:
         cover_long_request = MarketOrderRequest(
@@ -944,9 +905,8 @@ async def try_submit(request):
       o = g.tclient.submit_order(request)
       return o
   except APIError as e:
-    er = APIError_d(e)
-    if er['code'] == 40310000:
-      logger.warn('APIError code 40310000 with message: %s' % er['message'])
+    if e.status_code == 403:
+      logger.warn(e)
       await async.sleep(1)
       continue
     else:
@@ -955,14 +915,23 @@ async def try_submit(request):
       print(er)
       sys.exit(1)
 
+def try_replace(oid, request):
+  try:
+    o = g.tclient.replace_order_by_id(order_id=oid, order_data=request)
+    return o
+  except APIError as e:
+    logger.error('There was an error when replacing order %s' % oid)
+    logger.error(e)
+    return None
 
-def APIError_d(e):
-  if type(e._error) is dict: return e._error
-  elif type(e._error) is str: return json.loads(e._error)
-  else:
-    logger = logging.getLogger(__name__)
-    logger.error('APIError._error is neither a dictionary nor a string')
-    sys.exit(1)
+def try_cancel(oid):
+  try:
+    cancel_response = g.tclient.cancel_order_by_id(oid)
+    logger.info(cancel_response)
+  except APIError as e:
+    logger.error('There was an error when canceling order %s' % oid)
+    logger.error(e)
+  return
 
 # See https://github.com/python/cpython/blob/3.10/Lib/fractions.py
 def min_max(fraction, max_denominator):
