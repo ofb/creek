@@ -230,39 +230,55 @@ class Trade:
                               symbol = self._symbols[_short].symbol,
                               qty = self._position[_short]['qty'],
                               side = 'buy',
-                              client_order_id = stamp(self._title),
                               time_in_force = 'day')
     long_request = MarketOrderRequest(
                               symbol = self._symbols[_long].symbol,
                               qty = self._position[_long]['qty'],
                               side = 'sell',
-                              client_order_id = stamp(self._title),
                               time_in_force = 'day')
     g.orders[self._title] = {'buy': None, 'sell': None}
-    short_order = await try_submit(short_request)
-    long_order = await try_submit(long_request)
-    await asyncio.sleep(2)
-    if g.orders[self._title]['sell'].status == 'filled':
-      logger.info('%s long %s closed' % 
-                  (self._title, self._symbols[_long].symbol))
-    else:
-      logger.error('Market sell order %s for %s not filled: status %s' % 
-                   (g.orders[self._title]['sell'].id,
-                    self._symbols[_long].symbol,
-                    g.orders[self._title]['sell'].status))
-    if g.orders[self._title]['buy'].status == 'filled':
-      logger.info('%s short %s closed' % 
-                  (self._title, self._symbols[_short].symbol))
-    else:
-      logger.error('Market buy order %s for %s not filled: status %s' %
-                   (g.orders[self._title]['buy'].id,
-                    self._symbols[_short].symbol,
-                    g.orders[self._title]['buy'].status))
+    await asyncio.gather(bail_out_qty(short_request), 
+                         bail_out_qty(long_request))
     self._status = 'closed'
     return (self._hedge_position['symbol'],
             -1 * self._hedge_position['qty'])
 
-
+  async def bail_out_qty(r):
+    logger = logging.getLogger(__name__)
+    qty = r.qty
+    qty_filled = 0
+    qty_requested = qty
+    for i in range(20):
+      request = MarketOrderRequest(symbol = r.symbol,
+                                   qty = qty_requested,
+                                   side = r.side,
+                                   client_order_id = stamp(self._title),
+                                   time_in_force = 'day')
+      response = await try_submit(request)
+      if type(response) is int:
+        if response < qty_requested:
+          qty_requested = response
+          continue
+        else:
+          logger.error('Trade in %s rejected for lack of available shares but available shares exceed request' % r.symbol)
+          break
+      elif response is not None:
+        await asyncio.sleep(2)
+        if g.orders[self._title][r.side].status == 'filled':
+          qty_filled = qty_filled + qty_requested
+          if qty_filled < qty:
+            qty_requested = qty - qty_filled
+            continue
+          else: break
+        else:
+          logger.error('Market %s order %s for %s not filled: status %s'  
+                     % (r.side, g.orders[self._title][r.side].id,
+                        r.symbol, g.orders[self._title][r.side].status))
+          break
+    if qty == qty_filled:
+      logger.info('%s closed in trade %s' % (r.symbol, self._title))
+    else: logger.error('Unable to bail out of %s in trade %s' %
+                       (r.symbol, self._title))
 
   async def try_close(self, clock, latest_quote, latest_trade):
     logger = logging.getLogger(__name__)
@@ -782,7 +798,7 @@ class Trade:
                         - self._position[to_long]['qty']
                         * self._position[to_long]['avg_entry_price'])
       if hedge_notional < 0:
-        logger.error('%s: long position in %s exceeds short position in %s by %s; position will be unhedged', (self._title, self._symbols[to_long].symbol, self._symbols[to_short].symbol, abs(hedge_notional)))
+        logger.error('%s: long position in %s exceeds short position in %s by %s; position will be unhedged' % (self._title, self._symbols[to_long].symbol, self._symbols[to_short].symbol, abs(hedge_notional)))
         self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 
                                 'side':'long','notional':0.0,
                                 'qty':0,'avg_entry_price':0.0}
@@ -906,16 +922,22 @@ async def try_submit(request):
       return o
     except APIError as e:
       if e.status_code == 403:
-        logger.warn(e)
-        await asyncio.sleep(1)
-        continue
+        logger.error('APIError 403 when submitting a %s order for %s:' % (request.side, request.symbol))
+        logger.error(e)
+        error = APIError_d(e)
+        if 'available' in error.keys(): return int(error['available'])
+        else:
+          await asyncio.sleep(2)
+          continue
       else:
-        logger.error('APIError encountered during try_submit')
+        logger.error('Non-403 APIError encountered during try_submit')
         logger.error(er)
         print(er)
         sys.exit(1)
+  return None
 
 def try_replace(oid, request):
+  logger = logging.getLogger(__name__)
   try:
     o = g.tclient.replace_order_by_id(order_id=oid, order_data=request)
     return o
@@ -925,6 +947,7 @@ def try_replace(oid, request):
     return None
 
 def try_cancel(oid):
+  logger = logging.getLogger(__name__)
   try:
     cancel_response = g.tclient.cancel_order_by_id(oid)
     logger.info(cancel_response)
@@ -932,6 +955,14 @@ def try_cancel(oid):
     logger.error('There was an error when canceling order %s' % oid)
     logger.error(e)
   return
+
+def APIError_d(e):
+  if type(e._error) is dict: return e._error
+  elif type(e._error) is str: return json.loads(e._error)
+  else:
+    logger = logging.getLogger(__name__)
+    logger.error('APIError._error is neither a dictionary nor a string')
+    sys.exit(1)
 
 # See https://github.com/python/cpython/blob/3.10/Lib/fractions.py
 def min_max(fraction, max_denominator):
