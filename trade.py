@@ -904,16 +904,16 @@ async def try_submit(request):
     try:
       o = g.tclient.submit_order(request)
       return o
-  except APIError as e:
-    if e.status_code == 403:
-      logger.warn(e)
-      await async.sleep(1)
-      continue
-    else:
-      logger.error('APIError encountered during try_submit')
-      logger.error(er)
-      print(er)
-      sys.exit(1)
+    except APIError as e:
+      if e.status_code == 403:
+        logger.warn(e)
+        await async.sleep(1)
+        continue
+      else:
+        logger.error('APIError encountered during try_submit')
+        logger.error(er)
+        print(er)
+        sys.exit(1)
 
 def try_replace(oid, request):
   try:
