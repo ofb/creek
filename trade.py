@@ -247,8 +247,8 @@ class Trade:
                               client_order_id = stamp(self._title),
                               time_in_force = 'day')
     g.orders[self._title] = {'buy': None, 'sell': None}
-    short_order = g.tclient.submit_order(short_request)
-    long_order = g.tclient.submit_order(long_request)
+    short_order = await try_submit(short_request)
+    long_order = await try_submit(long_request)
     await asyncio.sleep(2)
     if g.orders[self._title]['sell'].status == 'filled':
       logger.info('%s long %s closed' % 
@@ -316,7 +316,7 @@ class Trade:
 #                      limit_price = short_limit
 #                      )
 #      g.orders[self._title] = {'buy': None, 'sell': None}
-#      short_order = g.tclient.submit_order(short_request)
+#      short_order = await try_submit(short_request)
 #      sigma_box_short = stddev * g.SIGMA_BOX if to_short else abs(stddev_x) * g.SIGMA_BOX
 #      await asyncio.sleep(2)
 #      for i in range(g.EXECUTION_ATTEMPTS):
@@ -351,7 +351,7 @@ class Trade:
 #                              side = 'sell',
 #                              client_order_id = stamp(self._title),
 #                              time_in_force = 'day')
-#        g.tclient.submit_order(fractional_long_request)
+#        await try_submit(fractional_long_request)
 #        await asyncio.sleep(2)
 #        if g.orders[self._title]['sell'].status == 'filled':
 #          logger.info('%s closed' % self._title)
@@ -395,7 +395,7 @@ class Trade:
 #                              side = 'sell',
 #                              client_order_id = stamp(self._title),
 #                              time_in_force = 'day')
-#        adjust_long_order = g.tclient.submit_order(adjust_long_request)
+#        adjust_long_order = await try_submit(adjust_long_request)
 #        await asyncio.sleep(2)
 #        if g.orders[self._title]['sell'].status != 'filled':
 #          logger.error('Market buy order for %s not filled (status %s); position remains open and is unbalanced' %
@@ -429,8 +429,8 @@ class Trade:
                       limit_price = long_limit
                       )
     g.orders[self._title] = {'buy': None, 'sell': None}
-    short_order = g.tclient.submit_order(short_request)
-    long_order = g.tclient.submit_order(long_request)
+    short_order = await try_submit(short_request)
+    long_order = await try_submit(long_request)
     await asyncio.sleep(2)
     for i in range(g.EXECUTION_ATTEMPTS):
       if (g.orders[self._title]['buy'].status == 'filled' and
@@ -512,8 +512,8 @@ class Trade:
                        side = 'sell',
                        client_order_id = stamp(self._title),
                        time_in_force = 'day')
-      short_order = g.tclient.submit_order(short_request)
-      long_order = g.tclient.submit_order(long_request)
+      short_order = await try_submit(short_request)
+      long_order = await try_submit(long_request)
       await asyncio.sleep(2)
       if g.orders[self._title]['buy'].status != 'filled':
         logger.error('Market buy order for %s not filled: status %s',
@@ -610,7 +610,7 @@ class Trade:
 #                      )
 #      logger.info('Submitting short request for %s, qty=%s, limit_price=%s' % (self._symbols[to_short].symbol, math.floor((g.trade_size/2) / short_limit), short_limit))
 #      g.orders[self._title] = {'buy': None, 'sell': None}
-#      short_order = g.tclient.submit_order(short_request)
+#      short_order = await try_submit(short_request)
 #      sigma_box_short = stddev * g.SIGMA_BOX if to_short else abs(stddev_x) * g.SIGMA_BOX
 #      await asyncio.sleep(2)
 #      for i in range(g.EXECUTION_ATTEMPTS):
@@ -646,7 +646,7 @@ class Trade:
 #                              side = 'buy',
 #                              client_order_id = stamp(self._title),
 #                              time_in_force = 'day')
-#        g.tclient.submit_order(fractional_long_request)
+#        await try_submit(fractional_long_request)
 #        logger.info('Submitting fractional long request for %s, notional=%s' % (self._symbols[to_long].symbol, fractional_long_notional))
 #        await asyncio.sleep(2)
 #        if g.orders[self._title]['buy'].status == 'filled':
@@ -683,7 +683,7 @@ class Trade:
 #                              side = 'buy',
 #                              client_order_id = stamp(self._title),
 #                              time_in_force = 'day')
-#        cover_short_order = g.tclient.submit_order(cover_short_request)
+#        cover_short_order = await try_submit(cover_short_request)
 #        await asyncio.sleep(2)
 #        if g.orders[self._title]['buy'].status != 'filled':
 #          logger.error('Market buy order %s for %s not filled: status %s' %
@@ -747,8 +747,8 @@ class Trade:
     logger.info('Submitting long order for %s, qty=%s, limit price=%s' % (self._symbols[to_long].symbol, shares_to_long, long_limit))
     logger.info('Submitting short order for %s, qty=%s, limit price=%s' % (self._symbols[to_short].symbol, shares_to_short, short_limit))
     g.orders[self._title] = {'buy': None, 'sell': None}
-    short_order = g.tclient.submit_order(short_request)
-    long_order = g.tclient.submit_order(long_request)
+    short_order = await try_submit(short_request)
+    long_order = await try_submit(long_request)
     sigma_box_short = stddev * g.SIGMA_BOX if to_short else abs(stddev_x) * g.SIGMA_BOX
     sigma_box_long = stddev * g.SIGMA_BOX if to_long else abs(stddev_x) * g.SIGMA_BOX
     await asyncio.sleep(2)
@@ -848,7 +848,7 @@ class Trade:
                               side = 'sell',
                               client_order_id = stamp(self._title),
                               time_in_force = 'day')
-        cover_long_order = g.tclient.submit_order(cover_long_request)
+        cover_long_order = await try_submit(cover_long_request)
       if short_qty_filled > 0:
         cover_short_request = MarketOrderRequest(
                               symbol = self._symbols[to_short].symbol,
@@ -856,7 +856,7 @@ class Trade:
                               side = 'buy',
                               client_order_id = stamp(self._title),
                               time_in_force = 'day')
-        cover_short_order = g.tclient.submit_order(cover_short_request)
+        cover_short_order = await try_submit(cover_short_request)
       await asyncio.sleep(2)
       if g.orders[self._title]['buy'].status != 'filled':
         logger.error('Market buy order %s for %s not filled: status %s' %
@@ -937,18 +937,32 @@ def get_latest_trade(symbol_or_symbols):
                   symbol_or_symbols=symbol_or_symbols)
   return g.hclient.get_stock_latest_trade(trade_request)
 
-def APIError_code(e):
-  try:
-    c = e.code
-    return c
-  except TypeError as te:
-    if type(e._error) is str:
-      d = json.loads(e._error)
-      return d['code']
+async def try_submit(request):
+  logger = logging.getLogger(__name__)
+  for i in range(45):
+    try:
+      o = g.tclient.submit_order(request)
+      return o
+  except APIError as e:
+    er = APIError_d(e)
+    if er['code'] == 40310000:
+      logger.warn('APIError code 40310000 with message: %s' % er['message'])
+      await async.sleep(1)
+      continue
     else:
-      logger = logging.getLogger(__name__)
-      logger.error('Cannot find APIError code')
+      logger.error('APIError encountered during try_submit')
+      logger.error(er)
+      print(er)
       sys.exit(1)
+
+
+def APIError_d(e):
+  if type(e._error) is dict: return e._error
+  elif type(e._error) is str: return json.loads(e._error)
+  else:
+    logger = logging.getLogger(__name__)
+    logger.error('APIError._error is neither a dictionary nor a string')
+    sys.exit(1)
 
 # See https://github.com/python/cpython/blob/3.10/Lib/fractions.py
 def min_max(fraction, max_denominator):
@@ -988,7 +1002,7 @@ async def hedge(n):
                             side = 'buy',
                             client_order_id = stamp('hedge'),
                             time_in_force = 'day')
-  g.tclient.submit_order(fractional_long_request)
+  await try_submit(fractional_long_request)
   await asyncio.sleep(2)
   if g.orders['hedge']['buy'].status == 'filled':
     logger.info('%s hedged notional %s' % (g.HEDGE_SYMBOL, n))
@@ -1009,7 +1023,7 @@ async def hedge_close(symbol, qty, closed_trades_by_hedge):
                             side = 'sell',
                             client_order_id = stamp(symbol),
                             time_in_force = 'day')
-  g.tclient.submit_order(fractional_sell_request)
+  await try_submit(fractional_sell_request)
   await asyncio.sleep(2)
   if g.orders[symbol]['sell'].status == 'filled':
     logger.info('%s hedge reduced by qty %s' % (symbol, abs(qty)))
