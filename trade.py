@@ -217,7 +217,7 @@ class Trade:
         return 1
     return 0
 
-  async def bail_out(self):
+  async def bail_out(self, clock):
     '''
     Get the hell out
     '''
@@ -237,133 +237,23 @@ class Trade:
                               side = 'sell',
                               time_in_force = 'day')
     g.orders[self._title] = {'buy': None, 'sell': None}
-    filled = await asyncio.gather(market_qty(short_request), 
-                         market_qty(long_request))
+    filled = await asyncio.gather(market_qty(short_request,self._title), 
+                         market_qty(long_request, self._title))
     for i in range(2):
       j = _long if i else _short
+      avg_exit_price[j] = filled[i][1]
       if not filled[i][0]: logger.info('Bailed out of %s in trade %s' % (self._symbols[j].symbol, self._title))
       else: logger.error('Unable to bail out of %s in trade %s' %
                          (self._symbols[j].symbol, self._title))
     self._status = 'closed'
+    logger.info('%s closed' % self._title)
+    closed_self = ClosedTrade(self, clock.now(), avg_exit_price)
+    g.closed_trades.append(closed_self)
+    self._position = [{'side':None,'qty':0,'avg_entry_price':0.0},
+                      {'side':None,'qty':0,'avg_entry_price':0.0}]
     return (self._hedge_position['symbol'],
-            -1 * self._hedge_position['qty'])
+            -1 * self._hedge_position['qty'], closed_self)
 
-  async def market_qty(self, r):
-    logger = logging.getLogger(__name__)
-    qty = r.qty
-    qty_filled = 0
-    qty_requested = qty
-    prices = []
-    for i in range(20):
-      request = MarketOrderRequest(symbol = r.symbol,
-                                   qty = qty_requested,
-                                   side = r.side,
-                                   client_order_id = stamp(self._title),
-                                   time_in_force = 'day')
-      response = await try_submit(request)
-      if type(response) is int:
-        if response < qty_requested:
-          qty_requested = response
-          continue
-        else:
-          logger.error('Trade in %s rejected for lack of available shares but available shares exceed request' % r.symbol)
-          break
-      elif response is not None:
-        await asyncio.sleep(2)
-        if g.orders[self._title][r.side].status == 'filled':
-          prices.append((qty_requested,
-                 float(g.orders[self._title][r.side].filled_avg_price)))
-          qty_filled = qty_filled + qty_requested
-          if qty_filled < qty:
-            qty_requested = qty - qty_filled
-            continue
-          else: break
-        else:
-          logger.error('Market %s order %s for %s not filled: status %s'  
-                     % (r.side, g.orders[self._title][r.side].id,
-                        r.symbol, g.orders[self._title][r.side].status))
-          break
-    if qty_filled > 0:
-      return qty_filled, sum([a[0]*a[1] for a in prices])/qty_filled
-    else: return 0, 0.0
-
-
-
-  async def limit_qty(self, r, cushion, bid_ask):
-    logger = logging.getLogger(__name__)
-    qty = r.qty
-    qty_filled = 0
-    qty_requested = qty
-    prices = []
-    sign = 1 if r.side == 'buy' else -1
-    for i in range(20):
-      request = LimitOrderRequest()
-      request = LimitOrderRequest(
-                      symbol = r.symbol,
-                      qty = qty_requested,
-                      side = r.side,
-                      time_in_force = 'day',
-                      client_order_id = stamp(self._title),
-                      limit_price = r.limit_price
-                      )
-      response = await try_submit(request)
-      if type(response) is int:
-        if response < qty_requested:
-          qty_requested = response
-          continue
-        else:
-          logger.error('Trade in %s rejected for lack of available shares but available shares exceed request' % r.symbol)
-          break
-      elif response is not None:
-        order = response
-        limit = r.limit_price
-        await asyncio.sleep(2)
-        for i in range(g.EXECUTION_ATTEMPTS):
-          if g.orders[self._title][r.side].status == 'filled': break
-          else:
-            latest_trade = get_latest_trade(r.symbol)
-            new_limit=(
-              latest_trade[r.symbol].price + sign
-              * calc_cushion(i, g.EXECUTION_ATTEMPTS, bid_ask, cushion))
-            new_limit = round(new_limit, 2)
-            if new_limit != limit:
-              updated_request = ReplaceOrderRequest(
-                                   limit_price=new_limit,
-                                   client_order_id = stamp(self._title))
-              order_try = try_replace(response.id, updated_request)
-              order = order_try if order_try is not None else order
-              limit = new_limit
-            await asyncio.sleep(2)
-        if (g.orders[self._title][r.side].status == 'filled':
-          prices.append((qty_filled,
-                        g.orders[self._title][r.side].filled_avg_price))
-          qty_filled = qty_filled + qty_requested
-        else:
-          logger.warning('%s order unfilled after %s attempts, proceeding with market execution' % (self._title, g.EXECUTION_ATTEMPTS))
-          price_calc.append(
-            (int(g.orders[self._title][r.side].filled_qty), 
-             float(g.orders[self._title][r.side].filled_avg_price)))
-          try_cancel(order.id)
-          qty_remaining = qty_requested - price_calc[-1][0]
-          request = MarketOrderRequest(
-                       symbol = r.symbol,
-                       qty = qty_remaining,
-                       side = r.side,
-                       client_order_id = stamp(self._title),
-                       time_in_force = 'day')
-          market_filled = await market_qty(request)
-          price_calc.append(market_filled)
-          if market_filled[0] != qty_remaining:
-            logger.error('Only %s/%s shares of market order for %s filled',
-                     (market_filled[0], qty_remaining, r.symbol)
-          qty_filled = price_calc[-2][0] + price_calc[-1][0]
-        if qty_filled < qty:
-          qty_requested = qty - qty_filled
-          continue
-        else: break
-    if qty_filled > 0:
-      return qty_filled, sum([a[0]*a[1] for a in prices])/qty_filled
-    else: return 0, 0.0
 
 
   async def try_close(self, clock, latest_quote, latest_trade):
@@ -419,13 +309,15 @@ class Trade:
     short_order = await try_submit(short_request)
     long_order = await try_submit(long_request)
     filled = await asyncio.gather(
-               limit_qty(short_request, short_cushion, bid_ask[_short]),
-               limit_qty(long_request, long_cushion, bid_ask[_long]))
+               limit_qty(short_request, self._title, short_cushion, 
+                         bid_ask[_short]),
+               limit_qty(long_request, self._title, long_cushion, 
+                         bid_ask[_long]))
     avg_exit_price = {}
     for i in range(2):
       j = _long if i else _short
       avg_exit_price[j] = filled[i][1]
-      if filled[i][0] = self._position[j]['qty']: 
+      if filled[i][0] == self._position[j]['qty']: 
         logger.info('Successfully closed %s in trade %s' % (self._symbols[j].symbol, self._title))
       else: logger.error('Only closed %s/%s shares of %s in trade %s' %
                          (filled[i][0], 
@@ -474,7 +366,6 @@ class Trade:
       logger.info('Passing on %s as bid-ask spread for %s = %s while |stddev_x| = %s' % (self._title, self._symbols[1].symbol, bid_ask[1], abs(stddev_x)))
       return 0
 
-
     mean = self._mean(price[0])
     if price[1] > mean:
       to_long = 0
@@ -487,11 +378,6 @@ class Trade:
     logger.info('Opening %s, long %s, short %s' %
                 (self._title, self._symbols[to_long],
                  self._symbols[to_short]))
-
-
-
-
-
 
     if price[1] >= price[0]:
       expensive = 1
@@ -518,7 +404,7 @@ class Trade:
     if multiple > 1:
       shares_to_short = shares_to_short * multiple
       shares_to_long = shares_to_long * multiple
-
+    qty_requested = (shares_to_short, shares_to_long)
 
 
     short_cushion = stddev * g.SIGMA_CUSHION if to_short else abs(stddev_x) * g.SIGMA_CUSHION
@@ -546,118 +432,42 @@ class Trade:
     logger.info('Submitting long order for %s, qty=%s, limit price=%s' % (self._symbols[to_long].symbol, shares_to_long, long_limit))
     logger.info('Submitting short order for %s, qty=%s, limit price=%s' % (self._symbols[to_short].symbol, shares_to_short, short_limit))
     g.orders[self._title] = {'buy': None, 'sell': None}
-    short_order = await try_submit(short_request)
-    long_order = await try_submit(long_request)
-    sigma_box_short = stddev * g.SIGMA_BOX if to_short else abs(stddev_x) * g.SIGMA_BOX
-    sigma_box_long = stddev * g.SIGMA_BOX if to_long else abs(stddev_x) * g.SIGMA_BOX
-    await asyncio.sleep(2)
-    for i in range(g.EXECUTION_ATTEMPTS):
-      if (g.orders[self._title]['buy'].status == 'filled' and
-          g.orders[self._title]['sell'].status == 'filled'): break
-      if g.orders[self._title]['buy'].status != 'filled':
-        latest_trade = get_latest_trade(self._symbols[to_long].symbol)
-        if (latest_trade[self._symbols[to_long].symbol].price
-              > price[to_long] + sigma_box_long):
-          logger.info('%s exited the sigma box' % self._symbols[to_long].symbol)
-          break
-        new_long_limit=(
-            latest_trade[self._symbols[to_long].symbol].price 
-            + calc_cushion(i, g.EXECUTION_ATTEMPTS, bid_ask[to_long], 
-                           long_cushion))
-        new_long_limit = round(new_long_limit, 2)
-        if new_long_limit != long_limit:
-          updated_long_request = ReplaceOrderRequest(
-                                  limit_price=new_long_limit,
-                                  client_order_id = stamp(self._title))
-          logger.info('Updating limit price for %s to be %s' % (self._symbols[to_long].symbol, new_long_limit))
-          order_try = try_replace(long_order.id,
-                                  updated_long_request)
-          long_order = order_try if order_try is not None else long_order
-          long_limit = new_long_limit
-      if g.orders[self._title]['sell'].status != 'filled':
-        latest_trade = get_latest_trade(self._symbols[to_short].symbol)
-        if (latest_trade[self._symbols[to_short].symbol].price
-              < price[to_short] - sigma_box_short):
-          logger.info('%s exited the sigma box' % self._symbols[to_short].symbol)
-          break
-        new_short_limit=(
-            latest_trade[self._symbols[to_short].symbol].price 
-            - calc_cushion(i, g.EXECUTION_ATTEMPTS, bid_ask[to_short],
-                           short_cushion))
-        new_short_limit = round(new_short_limit, 2)
-        if new_short_limit != short_limit:
-          updated_short_request = ReplaceOrderRequest(
-                                  limit_price=new_short_limit,
-                                  client_order_id = stamp(self._title))
-          logger.info('Updating limit price for %s to be %s' % (self._symbols[to_short].symbol, new_short_limit))
-          order_try = try_replace(short_order.id,
-                                  updated_short_request)
-          short_order = order_try if order_try is not None else short_order
-          short_limit = new_short_limit
-      await asyncio.sleep(2)
-    if (g.orders[self._title]['buy'].status == 'filled' and
-        g.orders[self._title]['sell'].status == 'filled'):
-      self._position[to_short]={'side':'short',
-            'qty':int(g.orders[self._title]['sell'].filled_qty),
-            'avg_entry_price':float(g.orders[self._title]['sell'].filled_avg_price)}
-      self._position[to_long]={'side':'long',
-            'qty':int(g.orders[self._title]['buy'].filled_qty),
-            'avg_entry_price':float(g.orders[self._title]['buy'].filled_avg_price)}
-      self._status = 'open'
-      self._opened = clock.now()
-      hedge_notional = (self._position[to_short]['qty']
-                        * self._position[to_short]['avg_entry_price']
-                        - self._position[to_long]['qty']
-                        * self._position[to_long]['avg_entry_price'])
-      if hedge_notional < 0:
-        logger.error('%s: long position in %s exceeds short position in %s by %s; position will be unhedged' % (self._title, self._symbols[to_long].symbol, self._symbols[to_short].symbol, abs(hedge_notional)))
-        self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 
-                                'side':'long','notional':0.0,
-                                'qty':0,'avg_entry_price':0.0}
-        return 0
-      else:
-        self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 
+    filled = await asyncio.gather(
+             limit_qty(short_request, self._title, short_cushion, 
+                       bid_ask[to_short]),
+             limit_qty(long_request, self._title, long_cushion, 
+                       bid_ask[to_long]))
+    avg_exit_price = {}
+    for i in range(2):
+      j = to_long if i else to_short
+      avg_exit_price[j] = filled[i][1]
+      if filled[i][0] == qty_requested[i]:
+        logger.info('Successfully opened %s in trade %s' % (self._symbols[j].symbol, self._title))
+      else: logger.error('Only opened %s/%s shares of %s in trade %s' %
+                         (filled[i][0], qty_requested[i],
+                         self._symbols[j].symbol, self._title))
+
+    self._position[to_short]={'side':'short', 'qty':filled[0][0],
+                              'avg_entry_price':filled[0][1]}
+    self._position[to_long]={'side':'long', 'qty':filled[1][0], 
+                             'avg_entry_price':filled[1][1]}
+    self._status = 'open'
+    self._opened = clock.now()
+    hedge_notional = (self._position[to_short]['qty']
+                      * self._position[to_short]['avg_entry_price']
+                      - self._position[to_long]['qty']
+                      * self._position[to_long]['avg_entry_price'])
+    if hedge_notional < 0:
+      logger.error('%s: long position in %s exceeds short position in %s by %s; position will be unhedged' % (self._title, self._symbols[to_long].symbol, self._symbols[to_short].symbol, abs(hedge_notional)))
+      self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 
+                              'side':'long','notional':0.0,
+                              'qty':0,'avg_entry_price':0.0}
+      return 0
+    else:
+      self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 
                               'side':'long','notional':hedge_notional,
                               'qty':0,'avg_entry_price':0.0}
-        return hedge_notional
-    else:
-      logger.warning('%s order unfilled after %s attempts' %
-                     (self._title, g.EXECUTION_ATTEMPTS))
-      self._status = 'closed'
-      long_qty_filled = int(g.orders[self._title]['buy'].filled_qty)
-      short_qty_filled = int(g.orders[self._title]['sell'].filled_qty)
-      logger.info('Filled qty long = %s, short = %s' % (long_qty_filled, short_qty_filled))
-      try_cancel(long_order.id)
-      try_cancel(short_order.id)
-      if (short_qty_filled == 0 and long_qty_filled == 0): return 0
-      if long_qty_filled > 0:
-        cover_long_request = MarketOrderRequest(
-                              symbol = self._symbols[to_long].symbol,
-                              qty = long_qty_filled,
-                              side = 'sell',
-                              client_order_id = stamp(self._title),
-                              time_in_force = 'day')
-        cover_long_order = await try_submit(cover_long_request)
-      if short_qty_filled > 0:
-        cover_short_request = MarketOrderRequest(
-                              symbol = self._symbols[to_short].symbol,
-                              qty = short_qty_filled,
-                              side = 'buy',
-                              client_order_id = stamp(self._title),
-                              time_in_force = 'day')
-        cover_short_order = await try_submit(cover_short_request)
-      await asyncio.sleep(2)
-      if g.orders[self._title]['buy'].status != 'filled':
-        logger.error('Market buy order %s for %s not filled: status %s' %
-                     (g.orders[self._title]['buy'].id,
-                      self._symbols[to_short].symbol,
-                      g.orders[self._title]['buy'].status))
-      if g.orders[self._title]['sell'].status != 'filled':
-        logger.error('Market sell order %s for %s not filled: status %s' %
-                     (g.orders[self._title]['sell'].id,
-                      self._symbols[to_long].symbol,
-                      g.orders[self._title]['sell'].status))
-      return 0
+      return hedge_notional
 
 class ClosedTrade:
   def __init__(self, trade, closed, avg_exit_price, hedge_exit_price):
@@ -721,10 +531,127 @@ class ClosedTrade:
       'status': self._status,
       'symbols': [self._symbols[0].symbol, self._symbols[1].symbol],
     }
+
 def get_latest_trade(symbol_or_symbols):
   trade_request = StockLatestTradeRequest(
                   symbol_or_symbols=symbol_or_symbols)
   return g.hclient.get_stock_latest_trade(trade_request)
+
+async def market_qty(r, title):
+  logger = logging.getLogger(__name__)
+  qty = r.qty
+  qty_filled = 0
+  qty_requested = qty
+  prices = []
+  for i in range(20):
+    request = MarketOrderRequest(symbol = r.symbol,
+                                 qty = qty_requested,
+                                 side = r.side,
+                                 client_order_id = stamp(title),
+                                 time_in_force = 'day')
+    response = await try_submit(request)
+    if type(response) is int:
+      if response < qty_requested:
+        qty_requested = response
+        continue
+      else:
+        logger.error('Trade in %s rejected for lack of available shares but available shares exceed request' % r.symbol)
+        break
+    elif response is not None:
+      await asyncio.sleep(2)
+      if g.orders[title][r.side].status == 'filled':
+        prices.append((qty_requested,
+               float(g.orders[title][r.side].filled_avg_price)))
+        qty_filled = qty_filled + qty_requested
+        if qty_filled < qty:
+          qty_requested = qty - qty_filled
+          continue
+        else: break
+      else:
+        logger.error('Market %s order %s for %s not filled: status %s'  
+                   % (r.side, g.orders[title][r.side].id,
+                      r.symbol, g.orders[title][r.side].status))
+        break
+  if qty_filled > 0:
+    return qty_filled, sum([a[0]*a[1] for a in prices])/qty_filled
+  else: return 0, 0.0
+
+async def limit_qty(r, title, cushion, bid_ask):
+  logger = logging.getLogger(__name__)
+  qty = r.qty
+  qty_filled = 0
+  qty_requested = qty
+  prices = []
+  sign = 1 if r.side == 'buy' else -1
+  for i in range(20):
+    request = LimitOrderRequest(
+                    symbol = r.symbol,
+                    qty = qty_requested,
+                    side = r.side,
+                    time_in_force = 'day',
+                    client_order_id = stamp(title),
+                    limit_price = r.limit_price
+                    )
+    response = await try_submit(request)
+    if type(response) is int:
+      if response < qty_requested:
+        qty_requested = response
+        continue
+      else:
+        logger.error('Trade in %s rejected for lack of available shares but available shares exceed request' % r.symbol)
+        break
+    elif response is not None:
+      order = response
+      limit = r.limit_price
+      await asyncio.sleep(2)
+      for i in range(g.EXECUTION_ATTEMPTS):
+        if g.orders[title][r.side].status == 'filled': break
+        else:
+          latest_trade = get_latest_trade(r.symbol)
+          new_limit=(
+            latest_trade[r.symbol].price + sign
+            * calc_cushion(i, g.EXECUTION_ATTEMPTS, bid_ask, cushion))
+          new_limit = round(new_limit, 2)
+          logger.info('Replacing trade in %s by new limit %s' % (r.symbol, new_limit))
+          if new_limit != limit:
+            updated_request = ReplaceOrderRequest(
+                                 limit_price=new_limit,
+                                 client_order_id = stamp(title))
+            order_try = try_replace(order.id, updated_request)
+            logger.info('Replace order_try:')
+            logger.info(order_try)
+            order = order_try if order_try is not None else order
+            limit = new_limit
+          await asyncio.sleep(2)
+      if g.orders[title][r.side].status == 'filled':
+        prices.append((qty_requested,
+                      float(g.orders[title][r.side].filled_avg_price)))
+        qty_filled = qty_filled + qty_requested
+      else:
+        logger.warning('%s order unfilled after %s attempts, proceeding with market execution' % (title, g.EXECUTION_ATTEMPTS))
+        fap = float(g.orders[title][r.side].filled_avg_price) if g.orders[title][r.side].filled_avg_price is not None else 0
+        prices.append(
+          (int(g.orders[title][r.side].filled_qty), fap))
+        try_cancel(order.id)
+        qty_remaining = qty_requested - prices[-1][0]
+        request = MarketOrderRequest(
+                     symbol = r.symbol,
+                     qty = qty_remaining,
+                     side = r.side,
+                     client_order_id = stamp(title),
+                     time_in_force = 'day')
+        market_filled = await market_qty(request, self._title)
+        prices.append(market_filled)
+        if market_filled[0] != qty_remaining:
+          logger.error('Only %s/%s shares of market order for %s filled' % (market_filled[0], qty_remaining, r.symbol))
+        qty_filled = prices[-2][0] + prices[-1][0]
+      if qty_filled < qty:
+        qty_requested = qty - qty_filled
+        continue
+      else: break
+  if qty_filled > 0:
+    return qty_filled, sum([a[0]*a[1] for a in prices])/qty_filled
+  else: return 0, 0.0
 
 async def try_submit(request):
   logger = logging.getLogger(__name__)
@@ -787,9 +714,12 @@ def min_max(fraction, max_denominator):
     p0, q0, p1, q1 = p1, q1, p0+a*p1, q2
     n, d = d, n-a*d
   k = (max_denominator-q0)//q1
-  bound1 = (p0+k*p1, q0+k*q1) # lower bound
-  bound2 = (p1, q1) # upper bound
-  return bound1, bound2
+  # Sometimes lower bound, sometimes upper bound!
+  bound1 = (p0+k*p1, q0+k*q1)
+  bound2 = (p1, q1)
+  # Return lower bound, upper bound
+  if bound1[0]/bound1[1] < bound2[0]/bound2[1]: return bound1, bound2
+  else: return bound2, bound1
 
 def compute_bid_ask(latest_quote, symbols):
   ba = []
@@ -799,12 +729,15 @@ def compute_bid_ask(latest_quote, symbols):
   return ba[0], ba[1]
 
 def calc_cushion(i, attempts, bid_ask, cushion):
-  if cushion > 2 * bid_ask: return bid_ask * (1 + (i+1)/attempts)
-  else:
-    delta = ( 2 * bid_ask - cushion ) / attempts
-    return min(bid_ask * (1 + (i+1)/attempts),
-               cushion + delta * (i+1))
+  if bid_ask == 0:
+    logger = logging.getLogger(__name__)
+    logger.warning('bid_ask is 0')
+    bid_ask = 0.01
+  return min((i+1) * bid_ask, (i+1) * cushion)
 
+# We don't need to worry about not having enough shares available to
+# buy or sell because we will always have a position >= 0 in the hedge
+# symbols.
 async def hedge(n):
   logger = logging.getLogger(__name__)
   g.orders['hedge'] = {'buy': None}
@@ -847,25 +780,22 @@ async def hedge_close(symbol, qty, closed_trades_by_hedge):
                   g.orders[symbol]['sell'].status))
   return
 
-async def fix_positions(symbol, qty):
+async def fix_position(symbol, qty):
   logger = logging.getLogger(__name__)
-  if symbol in g.active_symbols:
-    int_qty = round(qty)
-    if abs(int_qty - qty) < 0.05: qty = int_qty
-  if qty == 0: return
   side = 'buy' if qty > 0 else 'sell'
   request = MarketOrderRequest(symbol = symbol, qty = abs(qty),
                                side = side,
-                               client_order_id = stamp(symbol),
                                time_in_force = 'day')
   g.orders[symbol] = {side: None}
-  await asyncio.sleep(2)
-  if g.orders[symbol][side].status == 'filled':
+  filled_qty, filled_avg_price = await market_qty(request, symbol)
+  if filled_qty == abs(qty):
     logger.info('Position in %s repaired' % symbol)
   else:
-    logger.error('Market %s order %s for %s not filled with status %s' %
+    logger.error('Market %s order %s for %s only %s/%s filled with status %s' %
                  (side, g.orders[symbol][side].id, symbol,
+                  filled_qty, abs(qty),
                   g.orders[symbol][side].status))
+  return
 
 def equity(account):
   return max(float(account.equity) - g.EXCESS_CAPITAL,1)
@@ -908,7 +838,7 @@ def stamp(s):
 # you buying 7.5 shares, and another trade asks you to go short 20,
 # there's no way to be short 12.5 shares. For this reason, currently we
 # don't try to trade fractional shares.
-def fractional_try_close_obsolete():
+async def fractional_try_close_obsolete():
   if False:
     if type(self._position[_long]['qty']) is float:
       short_cushion = stddev * g.SIGMA_CUSHION if _short else abs(stddev_x) * g.SIGMA_CUSHION
@@ -987,9 +917,9 @@ def fractional_try_close_obsolete():
         try_cancel(short_order.id)
         if qty_covered == 0: return 0
         else:
-           In this case our P/L calculations will be off since we will
-           not be recording the price of the shares partially covered, 
-           but this shouldn't be a problem as this should never happen 
+           # In this case our P/L calculations will be off since we will
+           # not be recording the price of the shares partially covered, 
+           # but this shouldn't be a problem as this should never happen 
           self._position[_short]['qty'] = (
             self._position[_short]['qty'] - qty_covered)
           adjust_long_request = MarketOrderRequest(
@@ -1006,7 +936,7 @@ def fractional_try_close_obsolete():
                         g.orders[self._title]['sell'].status))
         return 0
 
-def fractional_try_open_obsolete():
+async def fractional_try_open_obsolete():
   if False:
     if self._symbols[to_long].fractionable:
       short_cushion = stddev * g.SIGMA_CUSHION if to_short else abs(stddev_x) * g.SIGMA_CUSHION
@@ -1041,7 +971,7 @@ def fractional_try_open_obsolete():
                                   limit_price=new_short_limit,
                                   client_order_id = stamp(self._title))
             logger.info('Replacing short request for %s with limit price %s' % (self._symbols[to_short].symbol, new_short_limit))
-.           order_try = try_replace(short_order.id,
+            order_try = try_replace(short_order.id,
                                     updated_short_request)
             short_order = order_try if order_try is not None else short_order
             short_limit = new_short_limit

@@ -119,7 +119,7 @@ async def trading_stream_handler(update):
 
 def load_config():
   logger = logging.getLogger(__name__)
-  path = g.root + 'config.json'
+  path = os.path.join(g.root, 'config.json')
   try:
     with open(path, 'r') as f:
       d = json.load(f)
@@ -137,7 +137,7 @@ def save():
   plt.style.use('seaborn')
   logger.info('Saving TO_OPEN_SIGNAL + burn_list')
   config_data = {'TO_OPEN_SIGNAL': g.TO_OPEN_SIGNAL, 'burn_list': g.burn_list}
-  path = g.root + 'config.json'
+  path = os.path.join(g.root, 'config.json')
   try:
     with open(path, 'w') as f:
       json.dump(config_data, f, indent=2)

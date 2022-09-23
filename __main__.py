@@ -39,6 +39,11 @@ s.start()
 time.sleep(10) # to prevent circular import
 a = threading.Thread(target=io.account_wss, daemon=True)
 a.start()
+time.sleep(2)
+# Canceling open trades
+signal.cancel_all()
+asyncio.run(signal.resolve_positions())
+time.sleep(2)
 first_bar = False
 while not first_bar:
   time.sleep(1)

@@ -51,33 +51,52 @@ class Clock():
       time.sleep(delta.seconds)
     self.refresh()
 
+def cancel_all():
+  logger = logging.getLogger(__name__)
+  cancel_response = g.tclient.cancel_orders()
+  if len(cancel_response) > 0:
+    logger.info('There were canceled orders with the following HTTP statuses')
+    for s in cancel_response:
+      logger.info(s)
+
+def num(s):
+  try:
+    q = int(s)
+  except ValueError as e:
+    q = float(s)
+  return q
+
 '''
 Compare open positions to actual positions and return the difference
 '''
-def resolve_positions():
+async def resolve_positions():
   logger = logging.getLogger(__name__)
   expected_positions = {}
   excess_positions = {}
-  for key, trade in g.trades.items():
-    if trade.status() == 'open':
+  for key, t in g.trades.items():
+    if t.status() == 'open':
       # side, qty, avg_entry_price
-      for s, p in trade.get_position():
+      for s, p in t.get_position():
         if p['qty'] < 0: logger.error('%s has position in %s with negative quantity' % (self._title, s))
         if s in expected_positions.keys():
           expected_positions[s] = expected_positions[s] + p['qty'] if p['side'] == 'long' else expected_positions[s] - p['qty']
         else: expected_positions[s] = p['qty'] if p['side'] == 'long' else - p['qty']
   g.positions = g.tclient.get_all_positions() # List[Position]
   for p in g.positions:
+    # p.qty is already signed
+    qty = num(p.qty)
     if p.symbol not in expected_positions.keys():
       logger.warning('There is an unknown position in %s' % p.symbol)
-      excess_positions[p.symbol] = {'side':p.side,'qty':float(p.qty)}
+      excess_positions[p.symbol] = qty
     else:
-      signed_qty = p.qty if p.side=='long' else -p.qty
-      if abs(expected_positions[p.symbol] - signed_qty) > 0.1:
-        logger.warning('Expected position in %s = %s; actual position = %s' % (p.symbol, expected_positions[p.symbol], signed_qty))
-        excess_positions[p.symbol]=(signed_qty - 
-                                    expected_positions[p.symbol])
-  return excess_positions
+      if abs(expected_positions[p.symbol] - qty) > 0.1:
+        logger.warning('Expected position in %s = %s; actual position = %s' % (p.symbol, expected_positions[p.symbol], qty))
+        excess_positions[p.symbol] = qty - expected_positions[p.symbol]
+  
+  await asyncio.gather(*(trade.fix_position(s, -q)
+                         for s, q in excess_positions.items()))
+  logger.info('Positions resolved')
+  return
 
 '''
 Most trades will barely exceed the threshold, and those should be sorted
@@ -110,7 +129,7 @@ def remove_concentration(to_open):
     if key in positions_d.keys():
       position = positions_d[key]
       sign = 1 if position.side == 'long' else -1
-      frac_position = sign * position.cost_basis / g.equity
+      frac_position = sign * float(position.cost_basis) / g.equity
     else: frac_position = 0
     # frac_position + longs * g.MAX_TRADE_SIZE / 2 <= g.MAX_SYMBOL
     longs = math.floor((g.MAX_SYMBOL
@@ -194,7 +213,7 @@ async def main(clock):
   latest_quote = g.hclient.get_stock_latest_quote(quote_request)
   latest_trade = g.hclient.get_stock_latest_trade(trade_request)
   hedge = await asyncio.gather(
-    *(g.trades[k].bail_out() for k in to_bail_out),
+    *(g.trades[k].bail_out(clock) for k in to_bail_out),
     *(g.trades[k].try_close(clock, latest_quote, latest_trade)
       for k in to_close),
     *(g.trades[k].try_open(clock, latest_quote, latest_trade)
@@ -228,7 +247,7 @@ async def main(clock):
       break
   for k in to_open_df[:n].index:
     if g.trades[k].status() == 'open':
-      g.trades[k].fill_hedge(hedged_price)  
+      g.trades[k].fill_hedge(hedged_price)
   # Give a moment for positions to update from the recent trades
   time.sleep(2)
   g.retarget['missed'].append(max(0,len(to_open_df) - n))
@@ -237,15 +256,8 @@ async def main(clock):
   g.cash = trade.cash(account)
   g.retarget['util'].append(1 - g.cash / g.equity)
   retarget(clock)
-  # Get positions after trades have settled
-  cancel_response = g.tclient.cancel_orders()
-  if len(cancel_response) > 0:
-    logger.info('There were canceled orders with the following HTTP statuses')
-    for s in cancel_response:
-      logger.info(s)
-  excess_positions = trade.resolve_positions()
-  await asyncio.gather(*(trade.fix_position(s, -q)
-                         for s, q in excess_positions.items()))
+  cancel_all()
+  await resolve_positions()
   logger.info('signal.main() finished after %s seconds' % (time.time() - start))
   if time.time() - start < 2: time.sleep(2)
   now = clock.now()
