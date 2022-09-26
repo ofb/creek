@@ -124,7 +124,12 @@ class Trade:
 
   def fill_hedge(self, price):
     self._hedge_position['avg_entry_price'] = price
-    self._hedge_position['qty'] = self._hedge_position['notional']/price
+    if price != 0.0:
+      self._hedge_position['qty'] = self._hedge_position['notional']/price
+    else:
+      logger = logging.getLogger(__name__)
+      self._hedge_position['qty'] = None
+      logger.error('Hedge fill price is 0.0')
     return
 
   def _mean(self, x):
@@ -640,7 +645,7 @@ async def limit_qty(r, title, cushion, bid_ask):
                      side = r.side,
                      client_order_id = stamp(title),
                      time_in_force = 'day')
-        market_filled = await market_qty(request, self._title)
+        market_filled = await market_qty(request, title)
         prices.append(market_filled)
         if market_filled[0] != qty_remaining:
           logger.error('Only %s/%s shares of market order for %s filled' % (market_filled[0], qty_remaining, r.symbol))
@@ -751,7 +756,7 @@ async def hedge(n):
   await asyncio.sleep(2)
   if g.orders['hedge']['buy'].status == 'filled':
     logger.info('%s hedged notional %s' % (g.HEDGE_SYMBOL, n))
-    return g.orders['hedge']['buy'].filled_avg_price
+    return float(g.orders['hedge']['buy'].filled_avg_price)
   else:
     logger.error('Market buy order %s for %s not filled with status %s' %
                  (g.orders['hedge']['buy'].id,

@@ -76,7 +76,7 @@ async def resolve_positions():
   for key, t in g.trades.items():
     if t.status() == 'open':
       # side, qty, avg_entry_price
-      for s, p in t.get_position():
+      for s, p in t.get_position().items():
         if p['qty'] < 0: logger.error('%s has position in %s with negative quantity' % (self._title, s))
         if s in expected_positions.keys():
           expected_positions[s] = expected_positions[s] + p['qty'] if p['side'] == 'long' else expected_positions[s] - p['qty']
@@ -243,7 +243,7 @@ async def main(clock):
   hedged_price = 0.0
   for h in hedged:
     if type(h) is float:
-      hedged_price  = h
+      hedged_price = h
       break
   for k in to_open_df[:n].index:
     if g.trades[k].status() == 'open':
@@ -261,8 +261,7 @@ async def main(clock):
   logger.info('signal.main() finished after %s seconds' % (time.time() - start))
   if time.time() - start < 2: time.sleep(2)
   now = clock.now()
-  if ((time.time() - start) > 60) and ((clock.next_close
-      - now) >= td(seconds=59)): return
+  if (time.time() - start) > 60: return
   elif ((clock.next_close - now) >= td(seconds=58)):
     if now.second==0: delta = 1-now.microsecond/1000000
     elif now.second<=2: return
@@ -270,3 +269,4 @@ async def main(clock):
     logger.info('Sleeping for %s seconds' % delta)
     time.sleep(delta)
     return
+  return
