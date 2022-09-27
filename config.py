@@ -59,7 +59,7 @@ SIGMA_BOX = 0.2
 EXECUTION_ATTEMPTS determines how many tries to attempt to get in or out
 of a position before resolving via a market order.
 '''
-EXECUTION_ATTEMPTS = 10
+EXECUTION_ATTEMPTS = 20
 '''
 The symbol of the ETF used to hedge our positions.
 Must be fractionable.

@@ -210,7 +210,7 @@ class Trade:
     '''
     logger = logging.getLogger(__name__)
     recent = self._sigma_series[-5:].to_list()
-    if len(recent == 5) and sum(recent)/5 > 6:
+    if len(recent) == 5 and sum(recent)/5 > 6:
       logger.info('Last 5 bars of %s have average sigma > 6, bailing out' % self._title)
       g.burn_list.append(self._title)
       return 1
@@ -228,7 +228,7 @@ class Trade:
     '''
     logger = logging.getLogger(__name__)
     _short = 0 if self._position[0]['side'] == 'short' else 1
-    _long = int(abs(1-to_short))
+    _long = int(abs(1-_short))
     self._status = 'closed'
     logger.info('Getting the hell out of %s' % self._title)
     short_request = MarketOrderRequest(
@@ -244,10 +244,11 @@ class Trade:
     g.orders[self._title] = {'buy': None, 'sell': None}
     filled = await asyncio.gather(market_qty(short_request,self._title), 
                          market_qty(long_request, self._title))
+    avg_exit_price = {}
     for i in range(2):
       j = _long if i else _short
       avg_exit_price[j] = filled[i][1]
-      if not filled[i][0]: logger.info('Bailed out of %s in trade %s' % (self._symbols[j].symbol, self._title))
+      if filled[i][0]: logger.info('Bailed out of %s in trade %s' % (self._symbols[j].symbol, self._title))
       else: logger.error('Unable to bail out of %s in trade %s' %
                          (self._symbols[j].symbol, self._title))
     self._status = 'closed'
@@ -475,7 +476,7 @@ class Trade:
       return hedge_notional
 
 class ClosedTrade:
-  def __init__(self, trade, closed, avg_exit_price, hedge_exit_price):
+  def __init__(self, trade, closed, avg_exit_price):
     self._symbols = trade._symbols
     self._pearson = trade._pearson
     self._pearson_historical = trade._pearson_historical
@@ -564,6 +565,8 @@ async def market_qty(r, title):
         break
     elif response is not None:
       await asyncio.sleep(2)
+      if g.orders[title][r.side].status == 'partially_filled':
+        await asyncio.sleep(4)
       if g.orders[title][r.side].status == 'filled':
         prices.append((qty_requested,
                float(g.orders[title][r.side].filled_avg_price)))
@@ -675,8 +678,8 @@ async def try_submit(request):
           continue
       else:
         logger.error('Non-403 APIError encountered during try_submit')
-        logger.error(er)
-        print(er)
+        logger.error(e)
+        print(e)
         sys.exit(1)
   return None
 
@@ -754,6 +757,8 @@ async def hedge(n):
                             time_in_force = 'day')
   await try_submit(fractional_long_request)
   await asyncio.sleep(2)
+  if g.orders['hedge']['buy'].status == 'partially_filled':
+    await asyncio.sleep(4)
   if g.orders['hedge']['buy'].status == 'filled':
     logger.info('%s hedged notional %s' % (g.HEDGE_SYMBOL, n))
     return float(g.orders['hedge']['buy'].filled_avg_price)
@@ -775,6 +780,8 @@ async def hedge_close(symbol, qty, closed_trades_by_hedge):
                             time_in_force = 'day')
   await try_submit(fractional_sell_request)
   await asyncio.sleep(2)
+  if g.orders[symbol]['sell'].status == 'partially_filled':
+    await asyncio.sleep(4)
   if g.orders[symbol]['sell'].status == 'filled':
     logger.info('%s hedge reduced by qty %s' % (symbol, abs(qty)))
     for t in closed_trades_by_hedge[symbol]:
