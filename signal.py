@@ -237,6 +237,8 @@ async def main(clock):
       if h[0] in closed_trades_by_hedge.keys():
         closed_trades_by_hedge[h[0]].append(h[2])
       else: closed_trades_by_hedge[h[0]] = [h[2]]
+  logger.info('Trying to close the following hedges:')
+  logger.info(hedge_d)
   hedged = await asyncio.gather(trade.hedge(hedge_notional),
     *(trade.hedge_close(symbol, qty, closed_trades_by_hedge)
       for symbol, qty in hedge_d.items()))

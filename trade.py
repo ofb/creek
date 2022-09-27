@@ -772,6 +772,8 @@ async def hedge(n):
 async def hedge_close(symbol, qty, closed_trades_by_hedge):
   logger = logging.getLogger(__name__)
   g.orders[symbol] = {'sell': None}
+  logger.info('Trying to reduce hedge position in %s by %s shares' %
+              (symbol, abs(qty)))
   fractional_sell_request = MarketOrderRequest(
                             symbol = symbol,
                             qty = abs(qty),
