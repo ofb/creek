@@ -49,7 +49,7 @@ while not first_bar:
   time.sleep(1)
   for symbol in g.active_symbols:
     if g.bars[symbol]: first_bar = True
-while ((clock.next_close - clock.now()) >= td(seconds=58)):
+while ((clock.next_close - clock.now()) >= td(minutes=1, seconds=58)):
   asyncio.run(signal.main(clock))
 io.save()
 io.report(initial_equity)

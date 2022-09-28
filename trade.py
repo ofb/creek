@@ -1,6 +1,7 @@
 import logging
 import pandas as pd
 import os
+import sys
 import asyncio
 import glob
 import time
@@ -21,6 +22,7 @@ from alpaca.trading.requests import LimitOrderRequest
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.requests import ReplaceOrderRequest
 from alpaca.data.requests import StockLatestTradeRequest
+from alpaca.data.requests import StockLatestQuoteRequest
 from alpaca.common.exceptions import APIError
 from . import config as g
 
@@ -128,7 +130,7 @@ class Trade:
       self._hedge_position['qty'] = self._hedge_position['notional']/price
     else:
       logger = logging.getLogger(__name__)
-      self._hedge_position['qty'] = None
+      self._hedge_position['qty'] = 0.0
       logger.error('Hedge fill price is 0.0')
     return
 
@@ -352,8 +354,13 @@ class Trade:
       logger.warn('%s not in latest_trade.keys()' % self._symbols[1].symbol)
       return 0
 
-    price = (latest_trade[self._symbols[0].symbol].price,
-             latest_trade[self._symbols[1].symbol].price)
+    price = (float(latest_trade[self._symbols[0].symbol].price),
+             float(latest_trade[self._symbols[1].symbol].price))
+    for i in range(2):
+      if price[i] == 0:
+        logger.error('%s price = %s, aborting' % 
+                     (self._symbols[i].symbol, price[i]))
+        return 0
     if price[0] > (g.trade_size / 2):
       logger.info('Passing on %s as one share of %s costs %s, whereas the max trade size is %s' % (self._title, self._symbols[0].symbol, price[0], g.trade_size))
       return 0
@@ -549,7 +556,7 @@ async def market_qty(r, title):
   qty_filled = 0
   qty_requested = qty
   prices = []
-  for i in range(20):
+  for i in range(g.EXECUTION_ATTEMPTS * 5):
     request = MarketOrderRequest(symbol = r.symbol,
                                  qty = qty_requested,
                                  side = r.side,
@@ -559,6 +566,9 @@ async def market_qty(r, title):
     if type(response) is int:
       if response < qty_requested:
         qty_requested = response
+        continue
+      elif response == 0:
+        await asyncio.sleep(5)
         continue
       else:
         logger.error('Trade in %s rejected for lack of available shares but available shares exceed request' % r.symbol)
@@ -591,7 +601,7 @@ async def limit_qty(r, title, cushion, bid_ask):
   qty_requested = qty
   prices = []
   sign = 1 if r.side == 'buy' else -1
-  for i in range(20):
+  for i in range(g.EXECUTION_ATTEMPTS * 5):
     request = LimitOrderRequest(
                     symbol = r.symbol,
                     qty = qty_requested,
@@ -602,8 +612,11 @@ async def limit_qty(r, title, cushion, bid_ask):
                     )
     response = await try_submit(request)
     if type(response) is int:
-      if response < qty_requested:
+      if response < qty_requested and response > 0:
         qty_requested = response
+        continue
+      elif response == 0:
+        await asyncio.sleep(5)
         continue
       else:
         logger.error('Trade in %s rejected for lack of available shares but available shares exceed request' % r.symbol)
@@ -748,6 +761,10 @@ def calc_cushion(i, attempts, bid_ask, cushion):
 # symbols.
 async def hedge(n):
   logger = logging.getLogger(__name__)
+  if n == 0:
+    quote_request = StockLatestQuoteRequest(symbol_or_symbols=g.HEDGE_SYMBOL)
+    latest_quote = g.hclient.get_stock_latest_quote(quote_request)
+    return float(latest_quote[g.HEDGE_SYMBOL].ask_price)
   g.orders['hedge'] = {'buy': None}
   fractional_long_request = MarketOrderRequest(
                             symbol = g.HEDGE_SYMBOL,
@@ -761,6 +778,10 @@ async def hedge(n):
     await asyncio.sleep(4)
   if g.orders['hedge']['buy'].status == 'filled':
     logger.info('%s hedged notional %s' % (g.HEDGE_SYMBOL, n))
+    return float(g.orders['hedge']['buy'].filled_avg_price)
+  # Rarely, the partial_fill notice can arrive *after* the fill notice
+  elif g.orders['hedge']['buy'].status == 'partially_filled':
+    logger.info('%s hedged notional %s only partially filled' % (g.HEDGE_SYMBOL, n))
     return float(g.orders['hedge']['buy'].filled_avg_price)
   else:
     logger.error('Market buy order %s for %s not filled with status %s' %
@@ -790,6 +811,11 @@ async def hedge_close(symbol, qty, closed_trades_by_hedge):
     await asyncio.sleep(4)
   if g.orders[symbol]['sell'].status == 'filled':
     logger.info('%s hedge reduced by qty %s' % (symbol, abs(qty)))
+    for t in closed_trades_by_hedge[symbol]:
+      t.set_hedge_exit_price(float(g.orders[symbol]['sell'].filled_avg_price))
+  # Rarely, the partial_fill notice can arrive *after* the fill notice
+  elif g.orders[symbol]['sell'].status == 'partially_filled':
+    logger.info('%s hedge reduction by qty %s only partially filled' % (symbol, abs(qty)))
     for t in closed_trades_by_hedge[symbol]:
       t.set_hedge_exit_price(float(g.orders[symbol]['sell'].filled_avg_price))
   else:

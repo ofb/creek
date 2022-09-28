@@ -147,23 +147,24 @@ def save():
   files = glob.glob(path)
   for f in files: os.remove(f)
   logger.info('Saving open trades')
-  for title, trade in g.trades.items():
-    path = g.root + '/open_trades/' + title + '.json'
-    try:
-      with open(path, 'w') as f:
-        json.dump(trade.to_dict(), f, indent=2)
-    except IOError as error:
-      logger.error('%s save failed:' % title)
-      logger.error(error)
-    path = g.root + '/open_trades/' + title + '.csv'
-    s = trade.get_sigma_series()
-    s.to_csv(path)
-    path = g.root + '/open_trades/' + title + '.png'
-    plt.clf()
-    fig = s.plot(kind='line',title=trade.title(),ylabel='sigma',rot=90)
-    fig = fig.get_figure()
-    fig.savefig(path, bbox_inches='tight', dpi=300)
-    plt.close()
+  for title, t in g.trades.items():
+    if t.status() == 'open':
+      path = g.root + '/open_trades/' + title + '.json'
+      try:
+        with open(path, 'w') as f:
+          json.dump(t.to_dict(), f, indent=2)
+      except IOError as error:
+        logger.error('%s save failed:' % title)
+        logger.error(error)
+      path = g.root + '/open_trades/' + title + '.csv'
+      s = t.get_sigma_series()
+      s.to_csv(path)
+      path = g.root + '/open_trades/' + title + '.png'
+      plt.clf()
+      fig = s.plot(kind='line',title=t.title(),ylabel='sigma',rot=90)
+      fig = fig.get_figure()
+      fig.savefig(path, bbox_inches='tight', dpi=300)
+      plt.close()
   logger.info('Save complete')
   return
 

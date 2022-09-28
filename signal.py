@@ -188,7 +188,7 @@ def retarget(clock):
 
 async def main(clock):
   logger = logging.getLogger(__name__)
-  logger.info('Entering main; len(AIRC) = %s' % len(g.bars['AIRC']))
+  logger.info('Entering main')
   start = time.time()
   to_close = []
   to_bail_out = []
@@ -264,7 +264,7 @@ async def main(clock):
   if time.time() - start < 2: time.sleep(2)
   now = clock.now()
   if (time.time() - start) > 60: return
-  elif ((clock.next_close - now) >= td(seconds=58)):
+  elif ((clock.next_close - now) >= td(minutes=1, seconds=58)):
     if now.second==0: delta = 1-now.microsecond/1000000
     elif now.second<=2: return
     else: delta = 61-now.second-now.microsecond/1000000
