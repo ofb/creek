@@ -771,6 +771,10 @@ async def hedge(n):
 
 async def hedge_close(symbol, qty, closed_trades_by_hedge):
   logger = logging.getLogger(__name__)
+  if qty == 0:
+    for t in closed_trades_by_hedge[symbol]:
+      t.set_hedge_exit_price(0.0)
+    return
   g.orders[symbol] = {'sell': None}
   logger.info('Trying to reduce hedge position in %s by %s shares' %
               (symbol, abs(qty)))
