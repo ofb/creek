@@ -108,11 +108,21 @@ async def trading_stream_handler(update):
     logger.error(update)
   else:
     if update.order.side == 'buy':
-      g.orders[coi]['buy'] = update.order
-      logger.info(update)
+      if ('buy' in g.orders[coi].keys() and 
+          g.orders[coi]['buy'] is not None and
+          g.orders[coi]['buy'].id == update.order.id and
+          g.orders[coi]['buy'].status == 'filled'): return
+      else:
+        g.orders[coi]['buy'] = update.order
+        logger.info(update)
     elif update.order.side == 'sell':
-      g.orders[coi]['sell'] = update.order
-      logger.info(update)
+      if ('sell' in g.orders[coi].keys() and 
+          g.orders[coi]['sell'] is not None and
+          g.orders[coi]['sell'].id == update.order.id and
+          g.orders[coi]['sell'].status == 'filled'): return
+      else:
+        g.orders[coi]['sell'] = update.order
+        logger.info(update)
     else:
       logger.warning('TradeUpdate for a trade with unknown side')
       logger.warning(update)

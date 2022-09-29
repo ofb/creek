@@ -779,7 +779,6 @@ async def hedge(n):
   if g.orders['hedge']['buy'].status == 'filled':
     logger.info('%s hedged notional %s' % (g.HEDGE_SYMBOL, n))
     return float(g.orders['hedge']['buy'].filled_avg_price)
-  # Rarely, the partial_fill notice can arrive *after* the fill notice
   elif g.orders['hedge']['buy'].status == 'partially_filled':
     logger.info('%s hedged notional %s only partially filled' % (g.HEDGE_SYMBOL, n))
     return float(g.orders['hedge']['buy'].filled_avg_price)
@@ -813,7 +812,6 @@ async def hedge_close(symbol, qty, closed_trades_by_hedge):
     logger.info('%s hedge reduced by qty %s' % (symbol, abs(qty)))
     for t in closed_trades_by_hedge[symbol]:
       t.set_hedge_exit_price(float(g.orders[symbol]['sell'].filled_avg_price))
-  # Rarely, the partial_fill notice can arrive *after* the fill notice
   elif g.orders[symbol]['sell'].status == 'partially_filled':
     logger.info('%s hedge reduction by qty %s only partially filled' % (symbol, abs(qty)))
     for t in closed_trades_by_hedge[symbol]:
