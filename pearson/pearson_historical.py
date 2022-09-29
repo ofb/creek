@@ -42,7 +42,7 @@ def initial_truncate(filename):
   resp = requests.get(url_v2 + 'assets', headers=headers)
   equity_raw = resp.json()
   symbol_dict = {}
-  fund_symbols = ['BAM', 'BAMR', 'KKR']
+  fund_symbols = ['BAM', 'BAMR', 'KKR', 'CG']
   for element in equity_raw:
     symbol_dict[element['symbol']] = element['name']
     if 'ETF' in element['name']:

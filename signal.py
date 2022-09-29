@@ -207,51 +207,54 @@ async def main(clock):
   to_open_df = remove_concentration(to_open_df)
   n = available_trades()
   symbols = list(set(to_open_df['long'][:n].to_list() +
-                 to_open_df['short'][:n].to_list() + to_close))
-  quote_request = StockLatestQuoteRequest(symbol_or_symbols=symbols)
-  trade_request = StockLatestTradeRequest(symbol_or_symbols=symbols)
-  latest_quote = g.hclient.get_stock_latest_quote(quote_request)
-  latest_trade = g.hclient.get_stock_latest_trade(trade_request)
-  hedge = await asyncio.gather(
-    *(g.trades[k].bail_out(clock) for k in to_bail_out),
-    *(g.trades[k].try_close(clock, latest_quote, latest_trade)
-      for k in to_close),
-    *(g.trades[k].try_open(clock, latest_quote, latest_trade)
-      for k in to_open_df[:n].index))
-  # Need to buy a fraction of an index for the remainder.
-  # Remember to add this index to active_symbols manually.
-  hedge_notional = 0.0 # To go long (in dollars)
-  hedge_d = {} # To cover (negative fractional quantity)
-  closed_trades_by_hedge = {} # Indexed by hedging symbol
-  for h in hedge:
-    if h == 0: continue
-    if type(h) is float:
-       if h < 0: logger.error('Negative hedge passed without symbol')
-       else: hedge_notional = hedge_notional + h
-    if type(h) is tuple:
-      if h[1] > 0:
-        logger.error('Positive hedge passed with symbol')
-        continue
-      elif h[0] in hedge_d.keys(): hedge_d[h[0]] = hedge_d[h[0]] + h[1]
-      else: hedge_d[h[0]] = h[1]
-      if h[0] in closed_trades_by_hedge.keys():
-        closed_trades_by_hedge[h[0]].append(h[2])
-      else: closed_trades_by_hedge[h[0]] = [h[2]]
-  logger.info('Trying to close the following hedges:')
-  logger.info(hedge_d)
-  hedged = await asyncio.gather(trade.hedge(hedge_notional),
-    *(trade.hedge_close(symbol, qty, closed_trades_by_hedge)
-      for symbol, qty in hedge_d.items()))
-  hedged_price = 0.0
-  for h in hedged:
-    if type(h) is float:
-      hedged_price = h
-      break
-  for k in to_open_df[:n].index:
-    if g.trades[k].status() == 'open':
-      g.trades[k].fill_hedge(hedged_price)
-  # Give a moment for positions to update from the recent trades
-  time.sleep(2)
+                 to_open_df['short'][:n].to_list() + to_close
+                 + to_bail_out))
+  if symbols:
+    quote_request = StockLatestQuoteRequest(symbol_or_symbols=symbols)
+    trade_request = StockLatestTradeRequest(symbol_or_symbols=symbols)
+    latest_quote = g.hclient.get_stock_latest_quote(quote_request)
+    latest_trade = g.hclient.get_stock_latest_trade(trade_request)
+    hedge = await asyncio.gather(
+      *(g.trades[k].bail_out(clock) for k in to_bail_out),
+      *(g.trades[k].try_close(clock, latest_quote, latest_trade)
+        for k in to_close),
+      *(g.trades[k].try_open(clock, latest_quote, latest_trade)
+        for k in to_open_df[:n].index))
+    # Need to buy a fraction of an index for the remainder.
+    # Remember to add this index to active_symbols manually.
+    hedge_notional = 0.0 # To go long (in dollars)
+    hedge_d = {} # To cover (negative fractional quantity)
+    closed_trades_by_hedge = {} # Indexed by hedging symbol
+    for h in hedge:
+      if h == 0: continue
+      if type(h) is float:
+         if h < 0: logger.error('Negative hedge passed without symbol')
+         else: hedge_notional = hedge_notional + h
+      if type(h) is tuple:
+        if h[1] > 0:
+          logger.error('Positive hedge passed with symbol')
+          continue
+        elif h[0] in hedge_d.keys():
+          hedge_d[h[0]] = hedge_d[h[0]] + h[1]
+        else: hedge_d[h[0]] = h[1]
+        if h[0] in closed_trades_by_hedge.keys():
+          closed_trades_by_hedge[h[0]].append(h[2])
+        else: closed_trades_by_hedge[h[0]] = [h[2]]
+    logger.info('Trying to close the following hedges:')
+    logger.info(hedge_d)
+    hedged = await asyncio.gather(trade.hedge(hedge_notional),
+      *(trade.hedge_close(symbol, qty, closed_trades_by_hedge)
+        for symbol, qty in hedge_d.items()))
+    hedged_price = 0.0
+    for h in hedged:
+      if type(h) is float:
+        hedged_price = h
+        break
+    for k in to_open_df[:n].index:
+      if g.trades[k].status() == 'open':
+        g.trades[k].fill_hedge(hedged_price)
+    # Give a moment for positions to update from the recent trades
+    time.sleep(2)
   g.retarget['missed'].append(max(0,len(to_open_df) - n))
   account = g.tclient.get_account()
   g.equity = trade.equity(account)

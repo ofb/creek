@@ -185,20 +185,20 @@ def report(equity):
   base_path = os.path.join(g.root, 'closed_trades', dt.now().strftime('%y-%m-%d'))
   pl = 0.0
   os.mkdir(base_path)
-  for trade in g.closed_trades:
-    pl = pl + trade.get_pl()
-    filename = trade.closed().strftime('%H-%M-') + trade.title()
+  for t in g.closed_trades:
+    pl = pl + t.get_pl()
+    filename = t.closed().strftime('%H-%M-') + t.title()
     path = os.path.join(base_path, filename + '.json')
     try:
       with open(path, 'w') as f:
-        json.dump(trade.to_dict(), f, indent=2)
+        json.dump(t.to_dict(), f, indent=2)
     except IOError as error:
-      logger.error('%s save failed:' % trade.title())
+      logger.error('%s save failed:' % t.title())
       logger.error(error)
-    s = trade.get_sigma_series()
+    s = t.get_sigma_series()
     plt.clf()
     path = os.path.join(base_path, filename + '.png')
-    fig = s.plot(kind='line',title=trade.title(),ylabel='sigma',rot=90)
+    fig = s.plot(kind='line',title=t.title(),ylabel='sigma',rot=90)
     fig = fig.get_figure()
     fig.savefig(path, bbox_inches='tight', dpi=300)
     plt.close()

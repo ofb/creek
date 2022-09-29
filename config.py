@@ -2,8 +2,8 @@ from alpaca.trading.client import TradingClient
 from alpaca.data.historical import StockHistoricalDataClient
 
 root = '/mnt/disks/creek-1/creek'
-key = 'PKPJP2B4UC1EQM94TAGE'
-secret_key = 'xMpqEXBAOxutI4plWrPri0nLTUvisItzDAUZQz4J'
+key = 'PKBNDY5V118UX0UZ63UQ'
+secret_key = 'AmkYFQ0OeDjVML7ZXF4MJwY4xx3NV6eHHVZToA8e'
 is_paper = True
 tclient = TradingClient(key, secret_key)
 hclient = StockHistoricalDataClient(api_key=key, secret_key=secret_key)

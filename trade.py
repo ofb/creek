@@ -529,7 +529,7 @@ class ClosedTrade:
   def title(self): return self._title
   def get_sigma_series(self):
     return self._sigma_series[self._opened:self._closed]
-  def get_pl(): return self._pl
+  def get_pl(self): return self._pl
   def to_dict(self):
     d = {
       'title': self._title,
@@ -843,7 +843,9 @@ def equity(account):
   return max(float(account.equity) - g.EXCESS_CAPITAL,1)
 
 def cash(account):
-  return max(float(account.cash) - g.EXCESS_CAPITAL,0)
+  return max(float(account.equity) - float(account.long_market_value)
+             - abs(float(account.short_market_value))
+             - g.EXCESS_CAPITAL,0)
 
 def account_ok():
   logger = logging.getLogger(__name__)
