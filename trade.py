@@ -211,15 +211,15 @@ class Trade:
     - If the mean of the standard deviation over the last week exceeds 4
     '''
     logger = logging.getLogger(__name__)
-    recent = self._sigma_series[-5:].to_list()
-    if len(recent) == 5 and sum(recent)/5 > 6:
-      logger.info('Last 5 bars of %s have average sigma > 6, bailing out' % self._title)
-      g.burn_list.append(self._title)
-      return 1
+    # recent = self._sigma_series[-5:].to_list()
+    # if len(recent) == 5 and sum(recent)/5 > 6:
+      # logger.info('Last 5 bars of %s have average sigma > 6, bailing out' % self._title)
+      # g.burn_list.append(self._title)
+      # return 1
     if (clock.now() - self._opened) > td(days=7):
       recent = self._sigma_series[(clock.now() - td(days=7)):].to_list()
-      if sum(recent)/max(len(recent),1) > 4:
-        logger.info('Last week of bars of %s have average sigma > 4, bailing out' % self._title)
+      if sum(recent)/max(len(recent),1) > 6:
+        logger.info('Last week of bars of %s have average sigma > 6, bailing out' % self._title)
         g.burn_list.append(self._title)
         return 1
     return 0
