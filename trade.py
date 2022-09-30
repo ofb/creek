@@ -843,9 +843,13 @@ def equity(account):
   return max(float(account.equity) - g.EXCESS_CAPITAL,1)
 
 def cash(account):
-  return max(float(account.equity) - float(account.long_market_value)
-             - abs(float(account.short_market_value))
-             - g.EXCESS_CAPITAL,0)
+  cash_basis = 0.0
+  for key, t in g.trades.items():
+  if t.status() == 'open':
+    # side, qty, avg_entry_price
+    for s, p in t.get_position().items():
+      cash_basis = cash_basis + p['qty'] * p['avg_entry_price']
+  return max(float(account.equity) - cash_basis - g.EXCESS_CAPITAL,0)
 
 def account_ok():
   logger = logging.getLogger(__name__)

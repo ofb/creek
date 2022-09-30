@@ -215,7 +215,8 @@ async def main(clock):
     latest_quote = g.hclient.get_stock_latest_quote(quote_request)
     latest_trade = g.hclient.get_stock_latest_trade(trade_request)
     hedge = await asyncio.gather(
-      *(g.trades[k].bail_out(clock) for k in to_bail_out),
+      *(g.trades[k].try_close(clock, latest_quote, latest_trade)
+        for k in to_bail_out),
       *(g.trades[k].try_close(clock, latest_quote, latest_trade)
         for k in to_close),
       *(g.trades[k].try_open(clock, latest_quote, latest_trade)
