@@ -85,7 +85,7 @@ class Trade:
     self._status = 'closed'
   
   # To initialize already-open trades
-  def open_init(dict, sigma_series):
+  def open_init(self, dict, sigma_series):
     logger = logging.getLogger(__name__)
     self._status = dict['status']
     self._opened = dt.fromisoformat(dict['opened']).astimezone(tz.timezone('US/Eastern'))
@@ -845,10 +845,10 @@ def equity(account):
 def cash(account):
   cash_basis = 0.0
   for key, t in g.trades.items():
-  if t.status() == 'open':
-    # side, qty, avg_entry_price
-    for s, p in t.get_position().items():
-      cash_basis = cash_basis + p['qty'] * p['avg_entry_price']
+    if t.status() == 'open':
+      # side, qty, avg_entry_price
+      for s, p in t.get_position().items():
+        cash_basis = cash_basis + p['qty'] * p['avg_entry_price']
   return max(float(account.equity) - cash_basis - g.EXCESS_CAPITAL,0)
 
 def account_ok():
