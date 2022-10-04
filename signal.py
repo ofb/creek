@@ -173,7 +173,7 @@ def retarget(clock):
   now = clock.now()
   if (30 <= now.minute < 40) and len(g.retarget['missed']) > 15 and len(g.retarget['util']) > 15:
     util = sum(g.retarget['util'])/len(g.retarget['util'])
-    missed = sum(g.retarget['missed'])
+    missed = sum(g.retarget['missed']) / len(g.retarget['missed'])
     if util + missed * g.MAX_TRADE_SIZE < 0.95:
       logger.info('Last hour util: %s. Last hour missed trades: %s. Lowering TO_OPEN_SIGNAL from %s to %s' % (util, missed, g.TO_OPEN_SIGNAL, g.TO_OPEN_SIGNAL - 0.1))
       g.TO_OPEN_SIGNAL = g.TO_OPEN_SIGNAL - 0.1

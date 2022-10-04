@@ -37,8 +37,8 @@ def read_trade(path, assets):
       trade_dict['pearson_historical'])
   path = path.split('.')[0] + '.csv'
   sigma_series = pd.read_csv(path, index_col=0,
-                             squeeze=True, parse_dates=True)
-  sigma_series.index = sigma_series.index.tz_convert(tz='US/Eastern')
+                      squeeze=True, parse_dates=True,
+                      date_parser=lambda x: pd.to_datetime(x, utc=True))
   t.open_init(trade_dict, sigma_series)
   return t
 
