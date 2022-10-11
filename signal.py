@@ -193,11 +193,16 @@ async def main(clock):
   to_close = []
   to_bail_out = []
   to_open = {}
+  symbols = []
   for key, t in g.trades.items():
     t.append_bar()
     if t.status() == 'open':
-      if t.bail_out_signal(clock): to_bail_out.append(key)
-      elif t.close_signal(clock): to_close.append(key)
+      if t.bail_out_signal(clock):
+        to_bail_out.append(key)
+        symbols.extend(key.split('-'))
+      elif t.close_signal(clock):
+        to_close.append(key)
+        symbols.extend(key.split('-'))
     elif t.status() == 'closed':
       o, d, l, s = t.open_signal(clock)
       if o: to_open[key] = [abs(t.pearson()), d, l, s]
@@ -207,8 +212,7 @@ async def main(clock):
   to_open_df = remove_concentration(to_open_df)
   n = available_trades()
   symbols = list(set(to_open_df['long'][:n].to_list() +
-                 to_open_df['short'][:n].to_list() + to_close
-                 + to_bail_out))
+                 to_open_df['short'][:n].to_list() + symbols))
   if symbols:
     quote_request = StockLatestQuoteRequest(symbol_or_symbols=symbols)
     trade_request = StockLatestTradeRequest(symbol_or_symbols=symbols)
