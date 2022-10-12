@@ -247,17 +247,25 @@ async def main(clock):
         else: closed_trades_by_hedge[h[0]] = [h[2]]
     logger.info('Trying to close the following hedges:')
     logger.info(hedge_d)
-    hedged = await asyncio.gather(trade.hedge(hedge_notional),
-      *(trade.hedge_close(symbol, qty, closed_trades_by_hedge)
-        for symbol, qty in hedge_d.items()))
-    hedged_price = 0.0
-    for h in hedged:
-      if type(h) is float:
-        hedged_price = h
-        break
-    for k in to_open_df[:n].index:
-      if g.trades[k].status() == 'open':
-        g.trades[k].fill_hedge(hedged_price)
+    if hedge_notional > 1: # Minimum notational amount
+      hedged = await asyncio.gather(trade.hedge(hedge_notional),
+        *(trade.hedge_close(symbol, qty, closed_trades_by_hedge)
+          for symbol, qty in hedge_d.items()))
+      hedged_price = 0.0
+      for h in hedged:
+        if type(h) is float:
+          hedged_price = h
+          break
+      for k in to_open_df[:n].index:
+        if g.trades[k].status() == 'open':
+          g.trades[k].fill_hedge(hedged_price)
+    else:
+      hedged = await asyncio.gather(
+        *(trade.hedge_close(symbol, qty, closed_trades_by_hedge)
+          for symbol, qty in hedge_d.items()))
+      for k in to_open_df[:n].index:
+        if g.trades[k].status() == 'open':
+          g.trades[k].zero_hedge()
     # Give a moment for positions to update from the recent trades
     time.sleep(2)
   g.retarget['missed'].append(max(0,len(to_open_df) - n))

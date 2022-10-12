@@ -2,8 +2,8 @@ from alpaca.trading.client import TradingClient
 from alpaca.data.historical import StockHistoricalDataClient
 
 root = '/mnt/disks/creek-1/creek'
-key = 'PKBNDY5V118UX0UZ63UQ'
-secret_key = 'AmkYFQ0OeDjVML7ZXF4MJwY4xx3NV6eHHVZToA8e'
+key = 'PKN5IDVMKEVZT6BV5IQ0'
+secret_key = 'gIod7zEIQ947E7qGryA6plPehXBYXkmXh1IH67S8'
 is_paper = True
 tclient = TradingClient(key, secret_key)
 hclient = StockHistoricalDataClient(api_key=key, secret_key=secret_key)
@@ -34,7 +34,7 @@ TO_OPEN_SIGNAL = 3.0
 MAX_TRADE_SIZE is the upper bound for the size of any one trade as a 
 fraction of total capital.
 '''
-MAX_TRADE_SIZE = 0.05
+MAX_TRADE_SIZE = 0.025
 '''
 EXCESS_CAPITAL is subtracted from absolute total capital to determine 
 (usable) total capital. (Useful when needing to take money out.)

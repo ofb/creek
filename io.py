@@ -146,7 +146,8 @@ def save():
   logger = logging.getLogger(__name__)
   plt.style.use('seaborn')
   logger.info('Saving TO_OPEN_SIGNAL + burn_list')
-  config_data = {'TO_OPEN_SIGNAL': g.TO_OPEN_SIGNAL, 'burn_list': g.burn_list}
+  burn_list = list(set(g.burn_list))
+  config_data = {'TO_OPEN_SIGNAL': g.TO_OPEN_SIGNAL, 'burn_list': burn_list}
   path = os.path.join(g.root, 'config.json')
   try:
     with open(path, 'w') as f:

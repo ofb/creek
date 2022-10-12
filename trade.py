@@ -134,6 +134,12 @@ class Trade:
       logger.error('Hedge fill price is 0.0')
     return
 
+  def zero_hedge(self):
+    self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 
+                            'side':'long','notional':0.0,
+                            'qty':0,'avg_entry_price':0.0}
+    return
+  
   def _mean(self, x):
     val = np.array([[x]], dtype=np.float32)
     return float(np.squeeze(self._model(val).mean().numpy()))
@@ -274,16 +280,16 @@ class Trade:
       return 0
     price = (latest_trade[self._symbols[0].symbol].price,
              latest_trade[self._symbols[1].symbol].price)
-    if (self._position[0]['qty'] == 0) or (self._position[1]['qty']):
+    if (self._position[0]['qty'] == 0) or (self._position[1]['qty'] == 0):
       logger.error('Trying to close an empty position %s', self._title)
       hedge_qty = self._hedge_position['qty']
       self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 
                               'side':'long','notional':0.0,
                               'qty':0,'avg_entry_price':0.0}
       self._status = 'closed'
-      return (self._hedge_position['symbol'], -1 * hedge_qty)
+      return 0
     _short = 0 if self._position[0]['side'] == 'short' else 1
-    _long = int(abs(1-to_short))
+    _long = int(abs(1-_short))
     bid_ask = compute_bid_ask(latest_quote, self._symbols)
     stddev = self._stddev(price[0])
     stddev_x = self._stddev_x(price[0]) # signed float
@@ -295,7 +301,7 @@ class Trade:
     short_limit = price[_short] + min(bid_ask[_short],short_cushion)
     short_limit = round(short_limit, 2)
     long_cushion = stddev * g.SIGMA_CUSHION if _long else abs(stddev_x) * g.SIGMA_CUSHION
-    long_limit = price[to_long] - min(bid_ask[_long],long_cushion)
+    long_limit = price[_long] - min(bid_ask[_long],long_cushion)
     long_limit = round(long_limit, 2)
     short_request = LimitOrderRequest(
                       symbol = self._symbols[_short].symbol,
@@ -314,8 +320,6 @@ class Trade:
                       limit_price = long_limit
                       )
     g.orders[self._title] = {'buy': None, 'sell': None}
-    short_order = await try_submit(short_request)
-    long_order = await try_submit(long_request)
     filled = await asyncio.gather(
                limit_qty(short_request, self._title, short_cushion, 
                          bid_ask[_short]),
@@ -761,10 +765,6 @@ def calc_cushion(i, attempts, bid_ask, cushion):
 # symbols.
 async def hedge(n):
   logger = logging.getLogger(__name__)
-  if n == 0:
-    quote_request = StockLatestQuoteRequest(symbol_or_symbols=g.HEDGE_SYMBOL)
-    latest_quote = g.hclient.get_stock_latest_quote(quote_request)
-    return float(latest_quote[g.HEDGE_SYMBOL].ask_price)
   g.orders['hedge'] = {'buy': None}
   fractional_long_request = MarketOrderRequest(
                             symbol = g.HEDGE_SYMBOL,
