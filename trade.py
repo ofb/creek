@@ -206,7 +206,7 @@ class Trade:
     if sigma < 0.25: return 1
     elif sigma < 0.5 and delta > td(weeks=1): return 1
     elif sigma < 1 and delta > td(weeks=2): return 1
-    elif sigma < 2 and delta > td(weels=3): return 1
+    elif sigma < 2 and delta > td(weeks=3): return 1
     else: return 0
 
   def bail_out_signal(self, clock):
@@ -545,7 +545,6 @@ class ClosedTrade:
       'hedge': self._hedge_position,
       'pearson': self._pearson,
       'pearson_historical': self._pearson_historical,
-      'status': self._status,
       'symbols': [self._symbols[0].symbol, self._symbols[1].symbol],
     }
 
