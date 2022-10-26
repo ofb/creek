@@ -547,6 +547,7 @@ class ClosedTrade:
       'pearson_historical': self._pearson_historical,
       'symbols': [self._symbols[0].symbol, self._symbols[1].symbol],
     }
+    return d
 
 def get_latest_trade(symbol_or_symbols):
   trade_request = StockLatestTradeRequest(
