@@ -757,7 +757,7 @@ def calc_cushion(i, attempts, bid_ask, cushion):
   if bid_ask == 0:
     logger = logging.getLogger(__name__)
     logger.warning('bid_ask is 0')
-    bid_ask = 0.01
+    bid_ask = 0.02
   return min((i+1) * bid_ask, (i+1) * cushion)
 
 # We don't need to worry about not having enough shares available to

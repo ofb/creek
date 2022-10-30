@@ -52,7 +52,7 @@ def get_bars(symbol, tf, s):
                      )
   return fetch_bars(request)
 
-def refresh_bar(s, path, tf):
+def refresh_bar(s, path, tf, error_counter):
   logger = logging.getLogger(__name__)
   if os.path.isfile(path):
     line = ll(path)
@@ -65,6 +65,10 @@ def refresh_bar(s, path, tf):
       if not bars.empty: bars.to_csv(path)
       return
     bars = get_bars(s, tf, lb_date)
+    if bars.empty:
+      logger.error('Unable to refresh %s' % s)
+      error_counter = True
+      return
     if abs(bars.iloc[0].open - float(line.split(',')[2])) > 0.01:
       logger.info('Bar price discrepancy; full refresh needed')
       bars = get_bars(s, tf, dt(g.historical_year,1,1))
@@ -85,9 +89,9 @@ def refresh_bar(s, path, tf):
     logger.info('Writing bars')
     if not bars.empty: bars.to_csv(path)
 
-def refresh_bars(s):
-  refresh_bar(s, os.path.join(g.minute_bar_dir, s + '.csv'), TimeFrame.Minute)
-  refresh_bar(s, os.path.join(g.hour_bar_dir, s + '.csv'), TimeFrame.Hour)
+def refresh_bars(s,error_counter):
+  refresh_bar(s, os.path.join(g.minute_bar_dir, s + '.csv'), TimeFrame.Minute, error_counter)
+  refresh_bar(s, os.path.join(g.hour_bar_dir, s + '.csv'), TimeFrame.Hour, error_counter)
   return
 
 def get_open_symbols():
@@ -118,10 +122,13 @@ def main():
   )
   logger = logging.getLogger(__name__)
   symbol_list = list(set(get_shortable_equities() + get_open_symbols()))
+  error_counter = False
   for i in range(len(symbol_list)):
     logger.info('Refreshing %s, %s/%s' %
                 (symbol_list[i], i+1, len(symbol_list)))
-    refresh_bars(symbol_list[i])
+    refresh_bars(symbol_list[i],error_counter)
+  if error_counter:
+    logger.warn('Some symbols were not updated')
   return
 
 if __name__ == '__main__':
