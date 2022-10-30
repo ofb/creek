@@ -9,7 +9,6 @@ import pandas as pd
 from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.requests import StockLatestQuoteRequest
 from . import trade
-from . import signal
 from . import config as g
 
 class Clock():

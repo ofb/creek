@@ -8,7 +8,7 @@ import asyncio
 from alpaca.trading.client import TradingClient
 from . import trade
 from . import io
-from . import signal
+from . import creek_signal as signal
 from . import config as g
 
 logging.basicConfig(

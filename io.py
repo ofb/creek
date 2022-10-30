@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from . import config as g
 from . import trade
-from . import signal
+from . import creek_signal as signal
 
 def get_assets():
   search_params = GetAssetsRequest(asset_class=AssetClass.US_EQUITY)
