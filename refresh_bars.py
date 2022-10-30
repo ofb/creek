@@ -19,6 +19,8 @@ from alpaca.common.exceptions import APIError
 import shutil
 import config as g
 
+default_year = 2022
+
 def ll(filename):
   with open(filename, 'rb') as f:
     try:  # catch OSError in case of a one line file 
@@ -31,6 +33,7 @@ def ll(filename):
   return last_line
 
 def fetch_bars(request):
+  logger = logging.getLogger(__name__)
   try:
     bars = g.hclient.get_stock_bars(request)
     return bars.df
@@ -47,7 +50,7 @@ def get_bars(symbol, tf, s):
                           limit=None,
                           start=s,
                           end=dt.now()-td(days=2),
-                          adjustment="all"
+                          adjustment="split"
                      )
   return fetch_bars(request)
 
@@ -59,7 +62,7 @@ def refresh_bar(s, path, tf):
     bars = get_bars(s, tf, lb_date)
     if abs(bars.iloc[0].open - float(line.split(',')[2])) > 0.01:
       logger.info('Bar price discrepancy; full refresh needed')
-      bars = get_bars(s, tf, dt(2015,1,1))
+      bars = get_bars(s, tf, dt(default_year,1,1))
       logger.info('Writing bars')
       if not bars.empty: bars.to_csv(path)
     else:
@@ -73,7 +76,7 @@ def refresh_bar(s, path, tf):
       shutil.move(path[:-4] + '-temp.csv', path)
   else:
     logger.info('No record found; pulling fresh bars')
-    bars = get_bars(s, tf, dt(2015,1,1))
+    bars = get_bars(s, tf, dt(default_year,1,1))
     logger.info('Writing bars')
     if not bars.empty: bars.to_csv(path)
 

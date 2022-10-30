@@ -2,7 +2,7 @@ from alpaca.trading.client import TradingClient
 from alpaca.data.historical import StockHistoricalDataClient
 
 root = '/mnt/disks/creek-1/creek'
-minute_bar_dir = '/mnt/disks/creek-1/us_equities'
+minute_bar_dir = '/mnt/disks/creek-1/us_equities_2022'
 hour_bar_dir = '/mnt/disks/creek-1/us_equities_hourly_test'
 key = 'PKN5IDVMKEVZT6BV5IQ0'
 secret_key = 'gIod7zEIQ947E7qGryA6plPehXBYXkmXh1IH67S8'
