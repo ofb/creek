@@ -114,6 +114,25 @@ def get_shortable_equities():
       symbols.append(a.symbol)
   return symbols
 
+def sanity_check():
+  request = StockBarsRequest(
+                          symbol_or_symbols='AAPL',
+                          timeframe=TimeFrame.Hour,
+                          limit=None,
+                          start=dt.now()-td(days=3),
+                          end=dt.now()-td(days=2),
+                          adjustment="split"
+                     )
+  bars = fetch_bars(request)
+  s = bars.to_csv()
+  s = s.split('\n')[0]
+  if s == 'symbol,timestamp,open,high,low,close,volume,trade_count,vwap':
+    return 1
+  else:
+    logger = logging.getLogger(__name__)
+    logger.error('Column is insane: %s' % s)
+    return 0
+
 def main():
   logging.basicConfig(
     level=logging.INFO,
@@ -121,6 +140,7 @@ def main():
     handlers=[logging.handlers.WatchedFileHandler(os.environ.get("LOGFILE", "creek-fetch_bars.log"))]
   )
   logger = logging.getLogger(__name__)
+  if not sanity_check(): return
   symbol_list = list(set(get_shortable_equities() + get_open_symbols()))
   error_counter = False
   for i in range(len(symbol_list)):
