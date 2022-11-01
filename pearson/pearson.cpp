@@ -11,20 +11,27 @@
 using namespace std;
 using namespace std::chrono;
 
-// Number of stocks with nonempty data = 5246
-// Number of rows in interpolated database for each stock = 308491
-unsigned int databaseRows = 308491;
 // https://www.gormanalysis.com/blog/reading-and-writing-csv-files-with-cpp/
+
+unsigned int get_rows()
+{
+	ifstream myFile("/mnt/disks/creek-1/pearson/pearson.config");
+	if (!myFile.is_open()) throw runtime_error("Could not open interpolated.csv");
+	string line;
+	if (myFile.good()) getline(myFile, line);
+	else throw runtime_error("config stream is not good");
+	return static_cast<unsigned int>(stoi(line));
+}
 
 vector<string> get_symbols()
 {
 	vector<string> stocks;
-	ifstream myFile("nonempty_shortable_equity_list.csv");
-	if (!myFile.is_open()) throw runtime_error("Could not open file");
+	ifstream myFile("/mnt/disks/creek-1/pearson/interpolated.csv");
+	if (!myFile.is_open()) throw runtime_error("Could not open interpolated.csv");
 	vector<string> row;
 	string line, word;
 	if (myFile.good()) getline(myFile, line);
-	else throw runtime_error("nonempty_shortable_equity_list.csv stream is not good");
+	else throw runtime_error("interpolated.csv stream is not good");
 	while (getline(myFile, line))
 	{
 		row.clear();
@@ -37,8 +44,8 @@ vector<string> get_symbols()
 	return stocks;
 }
 
-void get_data(const string& symbol, float* database) {
-	string path = "/mnt/disks/creek-1/us_equities_2022_interpolated/";
+void get_data(const string& symbol, float* database, unsigned int databaseRows) {
+	string path = "/mnt/disks/creek-1/us_equities_interpolated/";
 	path = path + symbol + ".csv";
 	ifstream myFile(path);
 	if (!myFile.is_open()) throw runtime_error("Could not open database");
@@ -64,7 +71,7 @@ void get_data(const string& symbol, float* database) {
 	return;
 }
 
-void pearson(float* x, float* y, float& result) {
+void pearson(float* x, float* y, float& result, unsigned int databaseRows) {
 	double sum_x = 0.0, sum_y = 0.0, sum_xy = 0.0;
 	double squaresum_x = 0.0, squaresum_y = 0.0;
 	for (unsigned int i = 0; i < databaseRows; i++) {
@@ -82,7 +89,7 @@ void pearson(float* x, float* y, float& result) {
 }
 
 void writeResults(float** results, vector<string>& symbols, const int N) {
-	ofstream myFile("pearson.csv");
+	ofstream myFile("/mnt/disks/creek-1/pearson/pearson.csv");
 	myFile << "symbol1,symbol2,pearson" << endl;
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N-i-1; j++) {
@@ -96,6 +103,7 @@ void writeResults(float** results, vector<string>& symbols, const int N) {
 
 int main ()
 {
+	unsigned int databaseRows = get_rows();
 	// Get starting timepoint
 	auto load_start = high_resolution_clock::now();
 	vector<string> symbols;
@@ -107,7 +115,7 @@ int main ()
 	database = new float*[N];
 	for (int i = 0; i < N; i++) {
 		database[i] = new float[databaseRows];
-		get_data(symbols[i], database[i]);
+		get_data(symbols[i], database[i], databaseRows);
 	}
 	// The following 2D array will store our results
 	float** results;
@@ -129,7 +137,7 @@ int main ()
 	#pragma omp parallel for schedule (static,1)
 	for (int i = 0; i < N; i++) {
 		for (int j = 0; j < N-i-1; j++) {
-			pearson(database[i], database[i+j+1], results[i][j]);
+			pearson(database[i], database[i+j+1], results[i][j], databaseRows);
 		}
 	}
 	// Get ending timepoint
