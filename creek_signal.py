@@ -98,6 +98,26 @@ async def resolve_positions():
   logger.info('Positions resolved')
   return
 
+def delete_json(k):
+  if g.trades[k].status() != 'closed': return
+  path = os.path.join(g.root, 'open_trades', k + '.json')
+  try: os.remove(path)
+  except FileNotFoundError: return
+  return
+  
+def save_json(k):
+  t = g.trades[k]
+  if t.status() != 'open': return
+  path = os.path.join(g.root, 'open_trades', k + '.json')
+  try:
+    with open(path, 'w') as f:
+      json.dump(t.to_dict(), f, indent=2)
+  except IOError as error:
+    logger = logging.getLogger(__name__)
+    logger.error('%s save failed:' % k)
+    logger.error(error)
+  return
+
 '''
 Most trades will barely exceed the threshold, and those should be sorted
 by their pearson coefficients. Some, however, will materially exceed the 
@@ -266,6 +286,9 @@ async def main(clock):
       for k in to_open_df[:n].index:
         if g.trades[k].status() == 'open':
           g.trades[k].zero_hedge()
+    for k in to_bail_out: delete_json(k)
+    for k in to_close: delete_json(k)
+    for k in to_open_df[:n].index: save_json(k)
     # Give a moment for positions to update from the recent trades
     time.sleep(2)
   g.retarget['missed'].append(max(0,len(to_open_df) - n))

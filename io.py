@@ -160,17 +160,17 @@ def save():
   logger.info('Saving open trades')
   for title, t in g.trades.items():
     if t.status() == 'open':
-      path = g.root + '/open_trades/' + title + '.json'
+      path = os.path.join(g.root, 'open_trades', title + '.json')
       try:
         with open(path, 'w') as f:
           json.dump(t.to_dict(), f, indent=2)
       except IOError as error:
         logger.error('%s save failed:' % title)
         logger.error(error)
-      path = g.root + '/open_trades/' + title + '.csv'
+      path = os.path.join(g.root, 'open_trades', title + '.csv')
       s = t.get_sigma_series()
       s.to_csv(path)
-      path = g.root + '/open_trades/' + title + '.png'
+      path = os.path.join(g.root, 'open_trades', title + '.png')
       plt.clf()
       fig = s.plot(kind='line',title=t.title(),ylabel='sigma',rot=90)
       fig = fig.get_figure()
