@@ -1,3 +1,4 @@
+import os
 import logging
 import asyncio
 from  datetime import datetime as dt
@@ -5,6 +6,7 @@ from datetime import timedelta as td
 import math
 import time
 import pytz as tz
+import json
 import pandas as pd
 from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.requests import StockLatestQuoteRequest

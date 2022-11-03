@@ -6,6 +6,7 @@ minute_bar_dir = '/mnt/disks/creek-1/us_equities'
 hour_bar_dir = '/mnt/disks/creek-1/us_equities_hourly'
 interpolated_bars_dir = '/mnt/disks/creek-1/us_equities_interpolated'
 pearson_dir = '/mnt/disks/creek-1/pearson'
+tf_dir = '/mnt/disks/creek-1/tf'
 historical_year = 2015
 key = 'PKN5IDVMKEVZT6BV5IQ0'
 secret_key = 'gIod7zEIQ947E7qGryA6plPehXBYXkmXh1IH67S8'

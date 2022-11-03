@@ -90,7 +90,7 @@ def main():
     f.write(str(target_length))
   pool = mp.Pool(mp.cpu_count())
   logger.info('Initializing %s pools', mp.cpu_count())
-  symbol_list = ['AAPL', 'GOOG', 'TSLA']
+  symbol_list = ['LBTYA','LBTYK','CM','BMO','SONY','BLK']
   for symbol in symbol_list:
     # A special problem is the construction of tuples containing 0 or 1 
     # items: the syntax has some extra quirks to accommodate these. 
