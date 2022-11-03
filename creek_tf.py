@@ -148,6 +148,17 @@ def clear_dir(path):
     os.remove(f)
   return
 
+def open_trades():
+  path = os.path.join(g.root, 'open_trades', '*.json')
+  files = glob.glob(path)
+  symbol1 = []
+  symbol2 = []
+  for f in files:
+    name = f.split('.')[0]
+    symbol1.append(name.split('-')[0])
+    symbol2.append(name.split('-')[1])
+  return pd.DataFrame({'symbol1': symbol1, 'symbol2': symbol2})
+
 def main():
   logging.basicConfig(
     level=logging.INFO,
@@ -170,6 +181,9 @@ def main():
   logger = logging.getLogger(__name__)
   path = os.path.join(g.pearson_dir, 'pearson_historical.csv')
   pearson = pd.read_csv(path)
+  pearson = pearson[['symbol1','symbol2']]
+  open_trades = add_open_trades()
+  pearson = pd.concat([pearson, open_trades])
   symbols = get_active_symbols(pearson)
   get_frames(symbols)
   logger.info('Beginning regression on %s pairs over %s epochs.' % (len(pearson), e))
