@@ -1,4 +1,3 @@
-import os
 import logging
 import asyncio
 from  datetime import datetime as dt
@@ -6,11 +5,11 @@ from datetime import timedelta as td
 import math
 import time
 import pytz as tz
-import json
 import pandas as pd
 from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.requests import StockLatestQuoteRequest
 from . import trade
+from . import io
 from . import config as g
 
 class Clock():
@@ -98,26 +97,6 @@ async def resolve_positions():
   await asyncio.gather(*(trade.fix_position(s, -q)
                          for s, q in excess_positions.items()))
   logger.info('Positions resolved')
-  return
-
-def delete_json(k):
-  if g.trades[k].status() != 'closed': return
-  path = os.path.join(g.root, 'open_trades', k + '.json')
-  try: os.remove(path)
-  except FileNotFoundError: return
-  return
-  
-def save_json(k):
-  t = g.trades[k]
-  if t.status() != 'open': return
-  path = os.path.join(g.root, 'open_trades', k + '.json')
-  try:
-    with open(path, 'w') as f:
-      json.dump(t.to_dict(), f, indent=2)
-  except IOError as error:
-    logger = logging.getLogger(__name__)
-    logger.error('%s save failed:' % k)
-    logger.error(error)
   return
 
 '''
@@ -288,9 +267,9 @@ async def main(clock):
       for k in to_open_df[:n].index:
         if g.trades[k].status() == 'open':
           g.trades[k].zero_hedge()
-    for k in to_bail_out: delete_json(k)
-    for k in to_close: delete_json(k)
-    for k in to_open_df[:n].index: save_json(k)
+    for k in to_bail_out: io.delete_json(k)
+    for k in to_close: io.delete_json(k)
+    for k in to_open_df[:n].index: io.save_json(k)
     # Give a moment for positions to update from the recent trades
     time.sleep(2)
   g.retarget['missed'].append(max(0,len(to_open_df) - n))

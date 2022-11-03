@@ -142,6 +142,26 @@ def load_config():
   logger.info('Loaded config')
   return
 
+def delete_json(k):
+  if g.trades[k].status() != 'closed': return
+  path = os.path.join(g.root, 'open_trades', k + '.json')
+  try: os.remove(path)
+  except FileNotFoundError: return
+  return
+  
+def save_json(k):
+  t = g.trades[k]
+  if t.status() != 'open': return
+  path = os.path.join(g.root, 'open_trades', k + '.json')
+  try:
+    with open(path, 'w') as f:
+      json.dump(t.to_dict(), f, indent=2)
+  except IOError as error:
+    logger = logging.getLogger(__name__)
+    logger.error('%s save failed:' % k)
+    logger.error(error)
+  return
+
 def save():
   logger = logging.getLogger(__name__)
   plt.style.use('seaborn')
@@ -160,13 +180,7 @@ def save():
   logger.info('Saving open trades')
   for title, t in g.trades.items():
     if t.status() == 'open':
-      path = os.path.join(g.root, 'open_trades', title + '.json')
-      try:
-        with open(path, 'w') as f:
-          json.dump(t.to_dict(), f, indent=2)
-      except IOError as error:
-        logger.error('%s save failed:' % title)
-        logger.error(error)
+      save_json(title)
       path = os.path.join(g.root, 'open_trades', title + '.csv')
       s = t.get_sigma_series()
       s.to_csv(path)
