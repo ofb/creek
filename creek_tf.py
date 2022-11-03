@@ -148,13 +148,14 @@ def clear_dir(path):
     os.remove(f)
   return
 
-def open_trades():
+def get_open_trades():
   path = os.path.join(g.root, 'open_trades', '*.json')
   files = glob.glob(path)
   symbol1 = []
   symbol2 = []
   for f in files:
-    name = f.split('.')[0]
+    name = f.split('/')[-1]
+    name = name.split('.')[0]
     symbol1.append(name.split('-')[0])
     symbol2.append(name.split('-')[1])
   return pd.DataFrame({'symbol1': symbol1, 'symbol2': symbol2})
@@ -182,7 +183,7 @@ def main():
   path = os.path.join(g.pearson_dir, 'pearson_historical.csv')
   pearson = pd.read_csv(path)
   pearson = pearson[['symbol1','symbol2']]
-  open_trades = add_open_trades()
+  open_trades = get_open_trades()
   pearson = pd.concat([pearson, open_trades])
   symbols = get_active_symbols(pearson)
   get_frames(symbols)
