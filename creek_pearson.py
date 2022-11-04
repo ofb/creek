@@ -203,6 +203,10 @@ def main():
   historical_sort()
   path = os.path.join(g.pearson_dir, 'pearson_historical.csv')
   p.to_csv(path)
+  path = os.path.join(g.root, 'pearson.csv')
+  path2 = os.path.join(g.root, 'pearson_backup.csv')
+  os.rename(path, path2)
+  p.to_csv(path)
 
 if __name__ == '__main__':
   main()

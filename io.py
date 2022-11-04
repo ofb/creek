@@ -2,6 +2,7 @@ import sys
 import os
 import logging
 import pandas as pd
+import numpy as np
 import asyncio
 import glob
 import json
@@ -13,7 +14,6 @@ from alpaca.data.live import StockDataStream
 from alpaca.trading.stream import TradingStream
 from alpaca.trading.models import Asset
 import matplotlib.pyplot as plt
-import pandas as pd
 from . import config as g
 from . import trade
 from . import creek_signal as signal
@@ -30,15 +30,20 @@ def get_assets():
 Saving/restoring trade objects
 '''
 def read_trade(path, assets):
+  logger = logging.getLogger(__name__)
   with open(path, 'r') as f:
     trade_dict = json.load(f)
   t = trade.Trade([assets[trade_dict['symbols'][0]],
       assets[trade_dict['symbols'][1]]], trade_dict['pearson'], 
       trade_dict['pearson_historical'])
   path = path.split('.')[0] + '.csv'
-  sigma_series = pd.read_csv(path, index_col=0,
+  try:
+    sigma_series = pd.read_csv(path, index_col=0,
                       squeeze=True, parse_dates=True,
                       date_parser=lambda x: pd.to_datetime(x, utc=True))
+  except FileNotFoundError:
+    logger.warn('%s not found' % path.split('/')[-1])
+    sigma_series = pd.Series(dtype=np.float64)
   t.open_init(trade_dict, sigma_series)
   return t
 
@@ -47,8 +52,10 @@ def load_trades():
   symbol_list = []
   trades = {}
   assets = get_assets()
-  pearson = pd.read_csv('%s/pearson.csv' % g.root, index_col=0)
-  open_trade_list = glob.glob('%s/open_trades/*.json' % g.root)
+  path = os.path.join(g.root, 'pearson.csv')
+  pearson = pd.read_csv(path, index_col=0)
+  path = os.path.join(g.root, 'open_trades', '*.json')
+  open_trade_list = glob.glob(path)
   logger.info('Loading open trades')
   for open_trade in open_trade_list:
     title = open_trade.split('/')[-1]
