@@ -11,6 +11,8 @@ tf.enable_v2_behavior()
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 from datetime import date
+from datetime import time
+from datetime import datetime as dt
 import pytz as tz
 import numpy as np
 import sys
@@ -45,11 +47,9 @@ def get_frames(symbols):
     frame.set_index('timestamp', inplace=True)
     frame.index = pd.to_datetime(frame.index)
     cutoff_date = date.today().replace(year=date.today().year-1)
-    cutoff = pd.to_datetime(cutoff_date.strftime('%Y-%m-%d') + ' 9:30')
-    cutoff = cutoff.tz_localize(tz.timezone('US/Eastern'))
-    cutoff = cutoff.tz_convert('UTC')
-    cutoff_str = cutoff.strftime('%Y-%m-%d %H:%M:%S%z')
-    frames[symbol] = frame.loc[cutoff_str:]
+    t = time(hour=9,minute=30,tzinfo=tz.timezone('US/Eastern'))
+    cutoff = dt.combine(cutoff_date, t)
+    frames[symbol] = frame[cutoff:]
   logger.info('Databases loaded')
   return
   

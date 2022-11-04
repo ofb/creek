@@ -5,6 +5,8 @@ import logging
 import logging.handlers
 import math
 from datetime import date
+from datetime import time
+from datetime import datetime as dt
 import pytz as tz
 from pandarallel import pandarallel
 import multiprocessing as mp # To get correct number of cpus
@@ -147,11 +149,9 @@ def is_sparse(row):
   cutoff = date.today().replace(year=date.today().year-3)
   if merged.iloc[0].name.date() > cutoff: return True
   one_year_date = date.today().replace(year=date.today().year-1)
-  one_year = pd.to_datetime(one_year_date.strftime('%Y-%m-%d') + ' 9:30')
-  one_year = one_year.tz_localize(tz.timezone('US/Eastern'))
-  one_year = one_year.tz_convert('UTC')
-  one_year_str = one_year.strftime('%Y-%m-%d %H:%M:%S%z')
-  n = len(merged.loc[one_year_str:])
+  t = time(hour=9,minute=30,tzinfo=tz.timezone('US/Eastern'))
+  one_year = dt.combine(start_date, t)
+  n = len(merged[one_year:])
   if (n < sparse_cutoff): return True
   return False
 

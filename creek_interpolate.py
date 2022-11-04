@@ -32,23 +32,15 @@ def interpolate(symbol):
   start_date = date.today().replace(year=date.today().year-1)
   buffer_start_date = start_date - td(days=7)
   end_date = date.today() - td(days=2)
-  start = pd.to_datetime(start_date.strftime('%Y-%m-%d') + ' 9:30')
-  start = start.tz_localize(tz.timezone('US/Eastern'))
-  start = start.tz_convert('UTC')
-  start_str = start.strftime('%Y-%m-%d %H:%M:%S%z')
-  buffer_start = pd.to_datetime(buffer_start_date.strftime('%Y-%m-%d') + ' 9:30')
-  buffer_start = buffer_start.tz_localize(tz.timezone('US/Eastern'))
-  buffer_start = buffer_start.tz_convert('UTC')
-  start_str = start.strftime('%Y-%m-%d %H:%M:%S%z')
-  end = pd.to_datetime(end_date.strftime('%Y-%m-%d') + ' 9:30')
-  end = end.tz_localize(tz.timezone('US/Eastern'))
-  end = end.tz_convert('UTC')
-  end_str = end.strftime('%Y-%m-%d %H:%M:%S%z')
+  t = time(hour=9,minute=30,tzinfo=tz.timezone('US/Eastern'))
+  start = dt.combine(start_date, t)
+  buffer_start = dt.combine(buffer_start_date, t)
+  end = dt.combine(end_date, t)
   if (interpolated_bars.iloc[0].name > buffer_start): return []
   if (interpolated_bars.iloc[-1].name < end):
     interpolated_bars.loc[end] = interpolated_bars.iloc[-1]['vwap']
   interpolated_bars = interpolated_bars.resample('1T').interpolate('linear')
-  interpolated_bars = interpolated_bars.loc[start_str:end_str]
+  interpolated_bars = interpolated_bars[start:end]
   return interpolated_bars
 
 def interpolate_wrapper(symbol, length):
@@ -90,7 +82,6 @@ def main():
     f.write(str(target_length))
   pool = mp.Pool(mp.cpu_count())
   logger.info('Initializing %s pools', mp.cpu_count())
-  symbol_list = ['LBTYA','LBTYK','CM','BMO','SONY','BLK']
   for symbol in symbol_list:
     # A special problem is the construction of tuples containing 0 or 1 
     # items: the syntax has some extra quirks to accommodate these. 
