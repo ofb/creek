@@ -47,7 +47,7 @@ def get_frames(symbols):
     frame.set_index('timestamp', inplace=True)
     frame.index = pd.to_datetime(frame.index)
     cutoff_date = date.today().replace(year=date.today().year-1)
-    t = time(hour=9,minute=30,tzinfo=tz.timezone('US/Eastern'))
+    t = time(hour=0,minute=0,tzinfo=tz.timezone('UTC'))
     cutoff = dt.combine(cutoff_date, t)
     frames[symbol] = frame[cutoff:]
   logger.info('Databases loaded')

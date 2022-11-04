@@ -132,8 +132,7 @@ def pearson_historical():
   global frames
   active_symbols = get_active_symbols()
   logger.info('Opening %s hour databases' % len(active_symbols))
-  for symbol in active_symbols:
-    get_frame(symbol, 'Hour')
+  for symbol in active_symbols: get_frame(symbol, 'Hour')
   logger.info('Completed loading hour databases')
   if not check_missing_bars(): return 0
   logger.info('Beginning Pearson correlation computation')
@@ -149,10 +148,10 @@ def is_sparse(row):
   cutoff = date.today().replace(year=date.today().year-3)
   if merged.iloc[0].name.date() > cutoff: return True
   one_year_date = date.today().replace(year=date.today().year-1)
-  t = time(hour=9,minute=30,tzinfo=tz.timezone('US/Eastern'))
-  one_year = dt.combine(start_date, t)
+  t = time(hour=0,minute=0,tzinfo=tz.timezone('UTC'))
+  one_year = dt.combine(one_year_date, t)
   n = len(merged[one_year:])
-  if (n < sparse_cutoff): return True
+  if n < sparse_cutoff: return True
   return False
 
 def historical_sort():

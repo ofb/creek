@@ -32,7 +32,7 @@ def interpolate(symbol):
   start_date = date.today().replace(year=date.today().year-1)
   buffer_start_date = start_date - td(days=7)
   end_date = date.today() - td(days=2)
-  t = time(hour=9,minute=30,tzinfo=tz.timezone('US/Eastern'))
+  t = time(hour=0,minute=0,tzinfo=tz.timezone('UTC'))
   start = dt.combine(start_date, t)
   buffer_start = dt.combine(buffer_start_date, t)
   end = dt.combine(end_date, t)
