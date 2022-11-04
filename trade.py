@@ -198,7 +198,7 @@ class Trade:
   def close_signal(self, clock):
     logger = logging.getLogger(__name__)
     if len(self._sigma_series) == 0:
-      logger.error('%s is open but has no sigma series' % self._title)
+      logger.warn('%s is open but has no sigma series' % self._title)
       return 0
     sigma = self._sigma_series[-1]
     time = self._sigma_series.index[-1]
