@@ -8,8 +8,8 @@ interpolated_bars_dir = '/mnt/disks/creek-2/us_equities_interpolated'
 pearson_dir = '/mnt/disks/creek-1/pearson'
 tf_dir = '/mnt/disks/creek-1/tf'
 historical_year = 2015
-key = 'PKN5IDVMKEVZT6BV5IQ0'
-secret_key = 'gIod7zEIQ947E7qGryA6plPehXBYXkmXh1IH67S8'
+key = 'PK34QHS0BEWTYL2038Z0'
+secret_key = 'F04h6CP3xLTHfzJIROfOOIkJPZelQyZMuQxPcM8H'
 is_paper = True
 tclient = TradingClient(key, secret_key)
 hclient = StockHistoricalDataClient(api_key=key, secret_key=secret_key)
