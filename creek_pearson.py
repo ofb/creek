@@ -198,8 +198,8 @@ def main():
   initial_truncate()
   r = pearson_historical()
   if not r: return
-  if not sparse_truncate(): return
   historical_sort()
+  if not sparse_truncate(): return
   path = os.path.join(g.pearson_dir, 'pearson_historical.csv')
   p.to_csv(path)
   path = os.path.join(g.root, 'pearson.csv')
