@@ -45,7 +45,7 @@ vector<string> get_symbols()
 }
 
 void get_data(const string& symbol, float* database, unsigned int databaseRows) {
-	string path = "/mnt/disks/creek-1/us_equities_interpolated/";
+	string path = "/mnt/disks/creek-2/us_equities_interpolated/";
 	path = path + symbol + ".csv";
 	ifstream myFile(path);
 	if (!myFile.is_open()) throw runtime_error("Could not open database");

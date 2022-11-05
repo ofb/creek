@@ -4,7 +4,7 @@ from alpaca.data.historical import StockHistoricalDataClient
 root = '/mnt/disks/creek-1/creek'
 minute_bar_dir = '/mnt/disks/creek-1/us_equities'
 hour_bar_dir = '/mnt/disks/creek-1/us_equities_hourly'
-interpolated_bars_dir = '/mnt/disks/creek-1/us_equities_interpolated'
+interpolated_bars_dir = '/mnt/disks/creek-2/us_equities_interpolated'
 pearson_dir = '/mnt/disks/creek-1/pearson'
 tf_dir = '/mnt/disks/creek-1/tf'
 historical_year = 2015
