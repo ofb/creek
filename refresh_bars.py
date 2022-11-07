@@ -47,7 +47,7 @@ def get_bars(symbol, tf, s):
                           timeframe=tf,
                           limit=None,
                           start=s,
-                          end=dt.now()-td(days=2),
+                          end=dt.now()-td(minutes=20),
                           adjustment="split"
                      )
   return fetch_bars(request)

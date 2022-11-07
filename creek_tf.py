@@ -193,5 +193,42 @@ def main():
   logger.info('Regression complete.')
   return
 
+def refresh_symbols(*argv):
+  a = [*argv]
+  logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
+    handlers=[logging.handlers.WatchedFileHandler(os.environ.get("LOGFILE", "creek-tf.log"))]
+  )
+  path = os.path.join(g.tf_dir, 'dev', '*')
+  clear_dir(path)
+  path = os.path.join(g.tf_dir, 'regression', '*')
+  clear_dir(path)
+  path = os.path.join(g.tf_dir, 'loss', '*')
+  clear_dir(path)
+  path = os.path.join(g.tf_dir, 'old_checkpoints', '*')
+  clear_dir(path)
+  path = os.path.join(g.root, 'checkpoints', '*')
+  files = glob.glob(path)
+  for f in files:
+    name = f.split('/')[-1]
+    title = name.split('.')[0]
+    if len(set(title.split('-')).intersection(set(a))) != 0:
+      shutil.move(f, os.path.join(g.tf_dir, 'old_checkpoints', name))
+  logger = logging.getLogger(__name__)
+  path = os.path.join(g.pearson_dir, 'pearson_historical.csv')
+  pearson = pd.read_csv(path)
+  pearson = pearson[['symbol1','symbol2']]
+  open_trades = get_open_trades()
+  pearson = pd.concat([pearson, open_trades])
+  pearson = pearson[pearson['symbol1'].isin(a) | pearson['symbol2'].isin(a)]
+  symbols = get_active_symbols(pearson)
+  get_frames(symbols)
+  logger.info('Beginning regression on %s pairs over %s epochs.' % (len(pearson), e))
+  pandarallel.initialize(nb_workers = mp.cpu_count(), progress_bar = True)
+  pearson.parallel_apply(regress, axis=1)
+  logger.info('Regression complete.')
+  return
+
 if __name__ == '__main__':
   main()
