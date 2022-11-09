@@ -474,8 +474,8 @@ class Trade:
                       * self._position[to_short]['avg_entry_price']
                       - self._position[to_long]['qty']
                       * self._position[to_long]['avg_entry_price'])
-    if hedge_notional < 0:
-      logger.error('%s: long position in %s exceeds short position in %s by %s; position will be unhedged' % (self._title, self._symbols[to_long].symbol, self._symbols[to_short].symbol, abs(hedge_notional)))
+    if hedge_notional < 1:
+      logger.error('%s: long position in %s - short position in %s = %s; position will be unhedged' % (self._title, self._symbols[to_long].symbol, self._symbols[to_short].symbol, hedge_notional))
       self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 
                               'side':'long','notional':0.0,
                               'qty':0,'avg_entry_price':0.0}
