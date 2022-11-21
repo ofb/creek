@@ -25,7 +25,7 @@ AIRC = trading_client.get_asset('AIRC')
 t = trade.Trade([AVB, AIRC], 0.9, 0.94)
 
 io.load_config()
-g.active_symbols, g.trades = io.load_trades()
+g.active_symbols = io.load_trades()
 # Also sets g.cash, g.equity, g.positions
 if not trade.account_ok(): sys.exit(1)
 initial_equity = g.equity

@@ -50,7 +50,7 @@ def read_trade(path, assets):
 def load_trades():
   logger = logging.getLogger(__name__)
   symbol_list = []
-  trades = {}
+  g.trades = {}
   assets = get_assets()
   path = os.path.join(g.root, 'pearson.csv')
   pearson = pd.read_csv(path, index_col=0)
@@ -62,19 +62,19 @@ def load_trades():
     title = title.split('.')[0]
     symbols = title.split('-')
     symbol_list.extend(symbols)
-    trades[title] = read_trade(open_trade, assets)
+    g.trades[title] = read_trade(open_trade, assets)
   logger.info('Loading remaining tensorflow models')
   for index, row in pearson.iterrows():
     title = row['symbol1'] + '-' + row['symbol2']
-    if title in trades.keys():
-      trades[title].pearson = float(row['pearson'])
-      trades[title].pearson_historical= float(row['pearson_historical'])
-    if title not in trades.keys():
+    if title in g.trades.keys():
+      g.trades[title].pearson = float(row['pearson'])
+      g.trades[title].pearson_historical= float(row['pearson_historical'])
+    if title not in g.trades.keys():
       symbol_list.extend([row['symbol1'],row['symbol2']])
-      trades[title] = trade.Trade([assets[row['symbol1']], 
-                                  assets[row['symbol2']]],
-                                  float(row['pearson']), 
-                                  float(row['pearson_historical']))
+      g.trades[title] = trade.Trade([assets[row['symbol1']], 
+                                    assets[row['symbol2']]],
+                                    float(row['pearson']), 
+                                    float(row['pearson_historical']))
   symbol_list.extend(g.HEDGE_SYMBOL_LIST)
   for p in g.positions:
     if p.symbol not in symbol_list:
@@ -90,7 +90,7 @@ def load_trades():
     if i == len(g.HEDGE_SYMBOL_LIST)-1:
       logger.error('None of the symbols in g.HEDGE_SYMBOL_LIST are fractionable, exiting')
       sys.exit(1)
-  return asset_dict, trades
+  return asset_dict
 
 def stock_wss():
   wss_client = StockDataStream(g.key, g.secret_key)

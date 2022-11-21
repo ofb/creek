@@ -74,8 +74,14 @@ class Trade:
     if not self._LoadWeights(): return
     if not self._symbols[0].tradable or not self._symbols[1].tradable:
       self._status = 'disabled'
+      return
     if not self._symbols[0].shortable or not self._symbols[1].shortable:
       self._status = 'disabled'
+      return
+    if reversed_title in g.trades.keys():
+      self._status = 'disabled'
+      return
+    reversed_title = self._symbols[1].symbol + '-' + self._symbols[0].symbol
     self._sigma_series = pd.Series(dtype=np.float64)
     self._opened = None # To be set in pytz timezone US/Eastern
     self._position = [{'side':None,'qty':0,'avg_entry_price':0.0},
@@ -83,6 +89,7 @@ class Trade:
     self._hedge_position = {'symbol':g.HEDGE_SYMBOL, 'side':'long',
                            'notional':0.0,'qty':0,'avg_entry_price':0.0}
     self._status = 'closed'
+    return
   
   # To initialize already-open trades
   def open_init(self, dict, sigma_series):
