@@ -78,10 +78,10 @@ class Trade:
     if not self._symbols[0].shortable or not self._symbols[1].shortable:
       self._status = 'disabled'
       return
+    reversed_title = self._symbols[1].symbol + '-' + self._symbols[0].symbol
     if reversed_title in g.trades.keys():
       self._status = 'disabled'
       return
-    reversed_title = self._symbols[1].symbol + '-' + self._symbols[0].symbol
     self._sigma_series = pd.Series(dtype=np.float64)
     self._opened = None # To be set in pytz timezone US/Eastern
     self._position = [{'side':None,'qty':0,'avg_entry_price':0.0},
