@@ -4,7 +4,7 @@
 2. Linearly regress pairs of stocks against each other, or one against several, until you find a correlated combination (e.g. an attractive R^2)
 3. For this combination (to simplify I assume pair), compute a probabilistic linear regression to produce a probability distribution with mean µ(x)
 4. Using this model, given live prices of the regressor (x) and regressand (y) as inputs, one computes the distance |y – µ(x)| as a percentage % of the standard deviation of your probability distribution at that x
-5. Your ‘signal’ is when this percentage % exceeds some threshold, at which point you short y and long x (if y > µ(x)) or long y and short x (if y < µ(x)) (possibly with confidence proportional to %; i.e. the larger %, the larger your position)
+5. Your ‘signal’ is when this percentage % exceeds some threshold, at which point you short y and long x (if y > µ(x)) or long y and short x (if y < µ(x))
 6. Integrate this recipe over time; i.e. your position is a linear function of % so in particular as % -> 0, you pare the trade to zero, or more simply, you maintain your position until the signal disappears or reverses.
 
 ## Pipeline
