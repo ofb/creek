@@ -71,7 +71,7 @@ void get_data(const string& symbol, float* database, unsigned int databaseRows) 
 	return;
 }
 
-void pearson(float* x, float* y, float& result, unsigned int databaseRows) {
+float pearson(const float* x, const float* y, unsigned int databaseRows) {
 	double sum_x = 0.0, sum_y = 0.0, sum_xy = 0.0;
 	double squaresum_x = 0.0, squaresum_y = 0.0;
 	for (unsigned int i = 0; i < databaseRows; i++) {
@@ -81,11 +81,10 @@ void pearson(float* x, float* y, float& result, unsigned int databaseRows) {
 		squaresum_x += x[i] * x[i];
 		squaresum_y += y[i] * y[i];
 	}
-	result = static_cast<float>((databaseRows * sum_xy - sum_x * sum_y)
+	return static_cast<float>((databaseRows * sum_xy - sum_x * sum_y)
 						/ sqrt((databaseRows * squaresum_x- sum_x * sum_x)
 							* (databaseRows * squaresum_y - sum_y * sum_y ))
 							);
-	return;
 }
 
 void writeResults(float** results, vector<string>& symbols, const int N) {
@@ -133,12 +132,20 @@ int main ()
 	
 	// Get starting timepoint
 	auto start = high_resolution_clock::now();
-	// must complile with openmp: g++ -fopenmp pearson.cpp
-	#pragma omp parallel for schedule (static,1)
-	for (int i = 0; i < N; i++) {
-		for (int j = 0; j < N-i-1; j++) {
-			pearson(database[i], database[i+j+1], results[i][j], databaseRows);
+
+	std::pair<size_t,size_t> pairs;
+	pairs.reserve(N * (N + 1) / 2);
+	for (size_t i = 0; i < N; i++) {
+		for (size_t j = 0; j < N-i-1; j++) {
+			pairs.emplace_back(i,j));
 		}
+	}
+	
+	// must complile with openmp: g++ -fopenmp pearson.cpp
+	#pragma omp parallel for schedule (static,10)
+	for (size_t i = 0; i < pairs.size(); i++) {
+		auto& p = pairs[i]; 
+		results[p.first][p.second] = pearson(database[p.first], database[p.first + p.second + 1], databaseRows);
 	}
 	// Get ending timepoint
 	auto stop = high_resolution_clock::now();
