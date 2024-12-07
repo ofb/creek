@@ -133,11 +133,11 @@ int main ()
 	// Get starting timepoint
 	auto start = high_resolution_clock::now();
 
-	std::pair<size_t,size_t> pairs;
+	std::vector<std::pair<size_t,size_t>> pairs;
 	pairs.reserve(N * (N + 1) / 2);
 	for (size_t i = 0; i < N; i++) {
 		for (size_t j = 0; j < N-i-1; j++) {
-			pairs.emplace_back(i,j));
+			pairs.emplace_back(make_pair(i,j));
 		}
 	}
 	
